@@ -751,21 +751,21 @@ When the API needs to be changed, we need to decide whether we can update the cu
 
 1. **New method for a new action**: Consumers that don't need the new method are not impacted, as they don't have to refresh the definition of the REST service.
 
-   > 📌 **[Diagram: Adding a new method to an existing microservices API without impacting consumers]**
+   ![Diagram showing the addition of a new method to an existing microservices API without impacting consumers.](https://success.outsystems.com/TK_Resource/c8ff4180-6bc6-4168-ab96-299127ec44c1)
 
 2. **Signature change that needs to be forced to every consumer**: In this case, breaking the current version forces the consumers to refresh the REST service.
 
-   > 📌 **[Diagram: Forced signature change in a microservices API and its impact on consumers]**
+   ![Diagram illustrating a forced signature change in a microservices API and its impact on consumers.](https://success.outsystems.com/TK_Resource/3034e65b-2976-4698-afb7-c88aacca0db2)
 
 **Create new API version**, if a method signature changed and it can't be forced to every consumer, so the previous version needs to be kept to preserve backward compatibility. There are two situations:
 
 1. **Non-disruptive change of method signature**: A signature change is non-disruptive if it only includes new optional attributes.
 
-   > 📌 **[Diagram: Non-disruptive change to a microservices API method signature with optional attributes]**
+   ![Diagram showing a non-disruptive change to a microservices API method signature with optional attributes.](https://success.outsystems.com/TK_Resource/53503623-45e1-48a3-989d-a56be532ef5a)
 
 2. **Disruptive change of method signature**: A signature change is disruptive if it includes new mandatory attributes or changes existing attribute names or types.
 
-   > 📌 **[Diagram: Disruptive change to a microservices API method signature, requiring versioning]**
+   ![Diagram depicting a disruptive change to a microservices API method signature, requiring versioning.](https://success.outsystems.com/TK_Resource/b2df3628-8662-4c72-9675-6b167f7ea612)
 
    In this case, the previous versions should be deprecated since they can't be made compatible with the new implementation. Hence, consumers should be forced to adopt the new version.
 
@@ -779,13 +779,13 @@ To isolate different microservices, simply add more microservices zones — Zone
 
 #### Scenario B — Separate Environment for Fully Isolated Microservices
 
-> 📌 **[Diagram: Separate environments for fully isolated microservices, each with its own infrastructure]**
+![Diagram of separate environments for fully isolated microservices, each with its own infrastructure.](https://success.outsystems.com/TK_Resource/90384efe-a511-4ef0-8b52-c52085798ff4)
 
 To isolate different microservices, simply add more microservices infrastructures — Infrastructure B example.
 
 #### Comparing Scenarios
 
-> 📌 **[Diagram: Comparative diagram of single and multiple infrastructure scenarios for microservices]**
+![Comparative diagram of single and multiple infrastructure scenarios for microservices.](https://success.outsystems.com/TK_Resource/a4c23004-3e5c-468a-89d7-522d0bc66f4c)
 
 ---
 
@@ -968,8 +968,8 @@ The following table shows some conventions:
 
 | Convention | Description |
 |------------|-------------|
-| ![Icon representing modules in the architecture blueprint with rounded rectangle shapes.](https://success.outsystems.com/TK_Resource/b736ea1c-5ac2-4c2d-8888-e63c1afa40d4) | Rectangles with round corners represent the modules. The rectangle color allows mapping each module to the level in the Architecture Canvas. |
-| ![Icon representing applications in the architecture blueprint with rectangles containing modules.](https://success.outsystems.com/TK_Resource/3efce4b5-b2e4-479a-9ed9-d7d5dee5c0e5) | Rectangles with modules inside represent Applications. The rectangle color is lighter than the module color, and it also allows you to map the application to the architecture layers. |
+| ![Icon representing modules in the architecture blueprint with rounded rectangle shapes.](https://success.outsystems.com/TK_Resource/9730e3a0-2252-4fae-8c3d-db93ab8a66b5) | Rectangles with round corners represent the modules. The rectangle color allows mapping each module to the level in the Architecture Canvas. |
+| ![Icon representing applications in the architecture blueprint with rectangles containing modules.](https://success.outsystems.com/TK_Resource/d34c4ef6-3fc6-4958-a2b8-c5bb6f5a6024) | Rectangles with modules inside represent Applications. The rectangle color is lighter than the module color, and it also allows you to map the application to the architecture layers. |
 
 In this example, there are two applications:
 - **Soccer Fields App**: this is the main application that contains the code to interact with the users and book the fields.
@@ -981,7 +981,7 @@ A good way of making sure the architecture is solid and you understand it, is to
 
 This is most important at the core level, where incorrect dependencies lead to circular reference, due to the lack of proper concept isolation. This results in code refactoring, that tend to have high risk and costs.
 
-![Diagram illustrating the dependencies between modules in the architecture blueprint.](https://success.outsystems.com/TK_Resource/4a9e1d2e-8c3b-4f5a-b6d7-e8f9a0b1c2d3)
+![Diagram illustrating the dependencies between modules in the architecture blueprint.](https://success.outsystems.com/TK_Resource/09c95460-bf3a-4d9e-9892-38979e92d6f3)
 
 Here are some insights:
 - **Booking_BL** works by the composition of two core concepts, fields, and players. These two core concepts are independent, meaning that when a player books a field, the Booking_BL module keeps that association.
@@ -1001,27 +1001,27 @@ Following your architecture design let's create the first application and module
 
 2. Create the first module — a theme module named **SF_Th**. Select the Responsive module type, then click on the **CREATE MODULE** button.
 
-   ![Screenshot of the module creation interface in Service Studio with the module name 'SF_Th' and module type options.](https://success.outsystems.com/TK_Resource/6f7a8b9c-0d1e-2f3a-4b5c-6d7e8f9a0b1c)
+   ![Screenshot of the module creation interface in Service Studio with the module name 'SF_Th' and module type options.](https://success.outsystems.com/TK_Resource/9ddf5b13-d19f-42b6-9332-170c64895b0b)
 
 3. Delete the **Emails** and **MainFlow** UI flows, then Publish.
 
-   ![Screenshot highlighting the 'Emails' and 'MainFlow' UI flows to be deleted in Service Studio.](https://success.outsystems.com/TK_Resource/2c3d4e5f-6a7b-8c9d-0e1f-2a3b4c5d6e7f)
+   ![Screenshot highlighting the 'Emails' and 'MainFlow' UI flows to be deleted in Service Studio.](https://success.outsystems.com/TK_Resource/1128b71d-128e-4583-add7-4612cbff3a6d)
 
 4. Create a new Responsive module named **SoccerFields** and publish it.
 
-   ![Screenshot showing the process of creating a new front-end module named 'SoccerFields' in Service Studio.](https://success.outsystems.com/TK_Resource/8a9b0c1d-2e3f-4a5b-6c7d-8e9f0a1b2c3d)
+   ![Screenshot showing the process of creating a new front-end module named 'SoccerFields' in Service Studio.](https://success.outsystems.com/TK_Resource/adc2dbd9-c25f-48eb-9bc2-886f1d239208)
 
 5. Set the **SoccerFields** module as the Home module.
 
-   ![Screenshot depicting how to set the 'SoccerFields' module as the Home module in Service Studio.](https://success.outsystems.com/TK_Resource/4e5f6a7b-8c9d-0e1f-2a3b-4c5d6e7f8a9b)
+   ![Screenshot depicting how to set the 'SoccerFields' module as the Home module in Service Studio.](https://success.outsystems.com/TK_Resource/6ac50af4-b79a-456a-930c-fef299b20935)
 
 6. Create **Booking_BL** module (Blank type).
 
-   ![Screenshot of the Service Studio interface for creating a new module named 'Booking_BL'.](https://success.outsystems.com/TK_Resource/0c1d2e3f-4a5b-6c7d-8e9f-0a1b2c3d4e5f)
+   ![Screenshot of the Service Studio interface for creating a new module named 'Booking_BL'.](https://success.outsystems.com/TK_Resource/8c63a8fe-067c-4d5d-bb30-04ac175b486c)
 
 7. Create **Player_CS** module (Blank type).
 
-   ![Screenshot showing the creation of a new module named 'Player_CS' in Service Studio.](https://success.outsystems.com/TK_Resource/6a7b8c9d-0e1f-2a3b-4c5d-6e7f8a9b0c1d)
+   ![Screenshot showing the creation of a new module named 'Player_CS' in Service Studio.](https://success.outsystems.com/TK_Resource/e9e91f66-21c1-4c27-9e81-d027192f146b)
 
 **The core application**
 
@@ -1029,7 +1029,7 @@ Repeat the first step done for the "Soccer Fields" application, but this time na
 
 Create the first module **Field_IS** with the **Blank** module type (not Responsive). The "Field Core Services" is a core services application and it shouldn't host any end-user screens.
 
-![Screenshot of the Service Studio interface for creating a new module named 'Field_IS'.](https://success.outsystems.com/TK_Resource/2e3f4a5b-6c7d-8e9f-0a1b-2c3d4e5f6a7b)
+![Screenshot of the Service Studio interface for creating a new module named 'Field_IS'.](https://success.outsystems.com/TK_Resource/ba53e6e8-e465-4281-97b7-da354933a2a9)
 
 After clicking on CREATE MODULE, publish your application. Then create the remaining modules: **Field_CS** and **Field_Sync** (both Blank type).
 
@@ -1043,7 +1043,7 @@ For this sample, it's not necessary to have a foundation application due to the 
 
 For this use case, there is an important integration pattern, to retrieve the soccer field information.
 
-![Diagram showing the architectural patterns for retrieving soccer field information.](https://success.outsystems.com/TK_Resource/8c9d0e1f-2a3b-4c5d-6e7f-8a9b0c1d2e3f)
+![Diagram showing the architectural patterns for retrieving soccer field information.](https://success.outsystems.com/TK_Resource/fbb8cf11-9baf-45b7-90ce-cf17a6ddc395)
 
 Focus on 3 architectural patterns:
 1. **Integration with an External System**
@@ -1056,41 +1056,41 @@ Focus on 3 architectural patterns:
 
 Open the **Field_IS** module, click on the Logic tab, and under the Integrations folder, right-click on the REST node and select **Consume REST API...**. Click on **ADD ALL METHODS** and fill the URL of the swagger file.
 
-![Screenshot of the REST API methods in Service Studio after consuming an external API.](https://success.outsystems.com/TK_Resource/4a5b6c7d-8e9f-0a1b-2c3d-4e5f6a7b8c9d)
+![Screenshot of the REST API methods in Service Studio after consuming an external API.](https://success.outsystems.com/TK_Resource/239e75fb-062d-47a3-a32d-452d281dcb9c)
 
 *Send the API Key*
 
 Implement the **OnBeforeRequest** event to send a valid key in the `API_KEY` request header (valid key: **"outsystems_is_awesome"**).
 
-![Screenshot showing the process of adding a new 'OnBeforeRequest' event to send the API key.](https://success.outsystems.com/TK_Resource/0e1f2a3b-4c5d-6e7f-8a9b-0c1d2e3f4a5b)
+![Screenshot showing the process of adding a new 'OnBeforeRequest' event to send the API key.](https://success.outsystems.com/TK_Resource/201afd21-019f-467f-a151-fde47fbf6815)
 
-![Screenshot of the logic flow for implementing the 'OnBeforeRequest' event in Service Studio.](https://success.outsystems.com/TK_Resource/6c7d8e9f-0a1b-2c3d-4e5f-6a7b8c9d0e1f)
+![Screenshot of the logic flow for implementing the 'OnBeforeRequest' event in Service Studio.](https://success.outsystems.com/TK_Resource/3f53820a-c4bd-43c3-b3ec-3158bb356534)
 
 *Retrieve a list of Fields with summary data*
 
 Create a structure named **Field_IS_Summary** — the output of an action providing the list of Fields from the external API to upper layers.
 
-![Screenshot showing the 'Field_IS_Summary' structure with attributes like Name, Dimension, and City.](https://success.outsystems.com/TK_Resource/2a3b4c5d-6e7f-8a9b-0c1d-2e3f4a5b6c7d)
+![Screenshot showing the 'Field_IS_Summary' structure with attributes like Name, Dimension, and City.](https://success.outsystems.com/TK_Resource/48b6a827-1b15-4cfb-8a0e-35eb4cfe5385)
 
 Create the server action **Field_IS_GetSummaryFields** (Public = Yes).
 
-![Screenshot of the logic flow for creating the 'Field_IS_GetSummaryFields' server action in Service Studio.](https://success.outsystems.com/TK_Resource/8e9f0a1b-2c3d-4e5f-6a7b-8c9d0e1f2a3b)
+![Screenshot of the logic flow for creating the 'Field_IS_GetSummaryFields' server action in Service Studio.](https://success.outsystems.com/TK_Resource/7b3e7e96-0b99-4f9b-89c7-a794c4ec65fc)
 
 **② Local Replica of data**
 
 On the **Field_CS**, create a new entity **Field**. Set Public and Expose Read-only properties to Yes.
 
-![Screenshot of the 'Field' entity properties in Service Studio with attributes like Name, Dimension, and City.](https://success.outsystems.com/TK_Resource/4c5d6e7f-8a9b-0c1d-2e3f-4a5b6c7d8e9f)
+![Screenshot of the 'Field' entity properties in Service Studio with attributes like Name, Dimension, and City.](https://success.outsystems.com/TK_Resource/c4723be2-e8d3-45e3-9831-312f29b218cf)
 
 Create **Field_Create** and **Field_CreateOrUpdate** CRUD actions.
 
-![Screenshot showing the creation of CRUD actions for the 'Field' entity in Service Studio.](https://success.outsystems.com/TK_Resource/0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d)
+![Screenshot showing the creation of CRUD actions for the 'Field' entity in Service Studio.](https://success.outsystems.com/TK_Resource/c5b7452e-c8f3-4e81-a268-efb259bc58c6)
 
 **③ Synchronization of data**
 
 The **Field_Sync** module makes the asynchronous synchronization from the external system into the local cached data.
 
-![Screenshot of the logic flow for the synchronization algorithm of field data in Service Studio.](https://success.outsystems.com/TK_Resource/6e7f8a9b-0c1d-2e3f-4a5b-6c7d8e9f0a1b)
+![Screenshot of the logic flow for the synchronization algorithm of field data in Service Studio.](https://success.outsystems.com/TK_Resource/90e1c89d-7057-4f47-b92d-33c934f4d4de)
 
 Synchronization algorithm steps:
 1. Set a logic timeout (10 minutes). GetSyncFieldCurrPages gets possible stored progress to continue processing.
@@ -1175,13 +1175,13 @@ The communication between AI Mentor Studio's components differs depending on you
 
 Communications between the AI Mentor Studio plugin and the AI Mentor Studio SaaS are always initiated by the plugin. This reduces connectivity requirements on your side since all that needs to be ensured is connectivity from the Plugin in the LifeTime environment to the AI Mentor Studio SaaS endpoint.
 
-![Diagram illustrating the communication flow initiated by the AI Mentor Studio plugin when using OutSystems account authentication.](https://success.outsystems.com/TK_Resource/85ef8f5c-f5a3-4ab6-acb7-dc48dce9b9ab)
+![Diagram illustrating the communication flow initiated by the AI Mentor Studio plugin when using OutSystems account authentication.](https://success.outsystems.com/TK_Resource/90f9dd40-ca73-4271-a131-36bf1a187ab1)
 
 **If you authenticate with your IT User account**
 
 AI Mentor Studio needs to be able to connect with your infrastructure to ensure the login is correct. When a user authenticates or accepts the privacy policy, the AI Mentor Studio SaaS needs to communicate with the AI Mentor Studio plugin. Thus, when using IT User authentication, the communication between the AI Mentor Studio SaaS and the AI Mentor Studio plugin is **bidirectional**.
 
-![Diagram showing bidirectional communication between AI Mentor Studio SaaS and the AI Mentor Studio plugin when using IT User account authentication.](https://success.outsystems.com/TK_Resource/9843c0f5-d6da-4ff5-b8ce-e0dc1c23c78a)
+![Diagram showing bidirectional communication between AI Mentor Studio SaaS and the AI Mentor Studio plugin when using IT User account authentication.](https://success.outsystems.com/TK_Resource/3a90cbaa-7cea-40d2-b77e-0b6932a4e071)
 
 With either authentication method, the plugin can use a forward proxy to connect to the AI Mentor Studio SaaS endpoint.
 
