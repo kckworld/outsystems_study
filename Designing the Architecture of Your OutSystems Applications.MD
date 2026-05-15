@@ -17,6 +17,10 @@
   - [6-3. Isolating an application Theme](#6-3-isolating-an-application-theme)
 - [7. Designing Scalable Multi-Tenant Applications](#7-designing-scalable-multi-tenant-applications)
 - [8. Microservices Architecture in OutSystems](#8-microservices-architecture-in-outsystems)
+- [9. From architecture to development](#9-from-architecture-to-development)
+  - [9-1. Developing from the architecture blueprint](#9-1-developing-from-the-architecture-blueprint)
+- [10. Manage technical debt](#10-manage-technical-debt)
+  - [10-1. How does AI Mentor Studio work](#10-1-how-does-ai-mentor-studio-work)
 
 ---
 
@@ -270,198 +274,208 @@ Integration Service는 특정 개념이 여러 시스템에 분산되어 있다�
 
 ## 5. Integration Patterns for Core Services Abstraction
 
-### Why do you need integration patterns? (왜 통합 패턴이 필요한가?)
+### Why do you need integration patterns?
 
-세 가지 독립적인 요구사항이 있습니다.
+외부 레코드 시스템과 통합하여 마스터 데이터를 조회하거나 트랜잭션을 수행해야 하는 경우, OutSystems로 가져오려는 개념을 추상화하는 패턴을 따르는 것이 좋습니다. 이를 통해 다음을 촉진할 수 있습니다.
 
-- **업무 독립성(Business Independence)**: 외부 시스템의 변경이 OutSystems 앱에 영향을 주지 않아야 합니다.
-- **확장성, 성능, 가용성(Scalability, performance, and availability)**: 외부 시스템의 성능·가용성 문제가 앱에 영향을 주지 않아야 합니다.
-- **감사, 모니터링, 통합 신뢰성(Auditing, monitoring, and integration reliability)**: 신뢰할 수 있는 통합을 위한 감사 및 모니터링이 가능해야 합니다.
+- **System independence (시스템 독립성)**: 외부 시스템을 변경하거나 교체할 때 개념 추상화의 구현에만 영향을 미치며, 개념의 소비자에게는 영향을 주지 않습니다.
+- **Extensibility, normalization, and optimization (확장성, 정규화, 최적화)**: 추가 정보와 비즈니스 규칙으로 개념을 확장하고, 표현을 정규화하며, 성능 향상을 위해 정보를 캐시하는 기회를 제공합니다.
 
 ![Integration pattern overview](https://success.outsystems.com/TK_Resource/05051ba3-cb1f-49b2-aef8-a37ba2590eb0)
 
-단순히 Integration Services만으로는 충분하지 않습니다. Integration Services는 외부 시스템의 기술적 복잡성을 추상화하지만, 외부 시스템의 성능·가용성 문제는 여전히 Core Services에 영향을 줄 수 있습니다.
+**1- Core Service**
 
-Integration Services와 Core Service 사이에 아무런 격리 없이 통합하면 다음과 같은 문제가 생깁니다.
+- 원래 서비스를 확장
+- 시스템 무관(system agnostic) — 외부 변경에 탄력적
 
-- **Scoring ML**: 성능 문제 — 외부 시스템 응답 속도에 종속
-- **Backoffice ML**: 외부 시스템 장애 시 앱 전체에 영향
-- **Flasc**: 실시간 호출로 인한 과부하
-- **Field App**: 외부 시스템 변경 시 Core Service까지 수정 필요
+**2- Integration Service**
+
+- 원래 API를 추상화하여 내부 구조와 개념에 매핑 (예: 여러 시스템의 보완 정보로 Customer 개념 구성)
+- 통합 유형 숨김 (SOAP, REST, XIF, HTTP request, file upload 등)
+- 기술적 요구사항 처리 (접근 자격증명, 권한 부여, 오류 처리, 통합 감사 등)
+
+Integration Service는 외부 시스템별 단일 통합 포인트가 아닌 **독립적인 개념별**로 가져야 합니다 (예: Customers용 하나).
+
+- 하나의 개념이 여러 시스템에서 지원될 수 있으며, Integration Service가 그 복잡성을 추상화합니다.
+- 하나의 시스템이 여러 개념을 지원할 수 있지만(예: Customers와 Products가 있는 ERP), 각 개념은 자체 라이프사이클을 가집니다. Customers 소비자는 Products에 관심이 없어야 하며, Products 변경에 영향을 받지 않아야 합니다.
 
 ### Integration Services — wrapping calls to an external system
 
+Integration Service는 외부 시스템에 대한 모든 호출을 wrap-up하여 통합 복잡성을 숨기고 재사용하기 쉬운 서비스를 추상화합니다. 아래 캔버스는 사용되는 통합 프로토콜(REST, SOAP, DLL Wrapper 등)에 관계없이 외부 시스템 호출을 wrapping할 때 처리해야 할 주요 사항들을 안내합니다.
+
+**Integration Wrapper Canvas:**
+
 ![Integration Services wrapping concerns](https://success.outsystems.com/TK_Resource/59716818-9fcc-4993-932c-7f9907e12809)
 
-Integration Services는 외부 시스템 호출을 wrapping할 때 다음 주요 사항을 담당합니다.
+- **Validation / Security logic**: 입력의 일관성을 확인합니다. 필요한 경우, 세션의 사용자가 이 호출을 수행할 자격이 있는지 확인합니다. 오류를 전파하기 위해 user exception을 발생시킵니다.
+- **Authentication logic**: 외부 API 호출에 필요한 인증 자격증명을 준비합니다.
+- **Map inputs**: 정규화된 입력을 외부 API에서 요구하는 형식으로 매핑합니다.
+- **Call and audit the external API**: 외부 API를 호출하고, integration trail이 필요한 경우 호출을 감사합니다.
+- **Normalize error handling**: Success 및 Error 메시지 출력을 처리하여, 해당 출력을 반환하는 대신 exception을 발생시킵니다 — OutSystems에서 기대하는 동작입니다.
+- **Normalize outputs**: 반환된 구조를 예상되는 정규화된 출력으로 매핑합니다.
+- **Exception handling**: 일반적으로 필요하지 않습니다. 오류는 호출자가 처리해야 합니다. 통합 exception을 감사하거나 사용자 인터페이스에 표시될 수 있는 exception 메시지를 정규화하는 데 사용할 수 있습니다.
 
-| 역할                     | 설명                                      |
-| ------------------------ | ----------------------------------------- |
-| **Abstract Data Source** | 내부 데이터 소스 (OutSystems 로컬 엔티티) |
-| **Synchronize data**     | 외부 DB 동기화                            |
-| **Act as cache**         | Full cache with delta sync                |
-| **Error handling**       | Real-time sync, Ordered real-time sync    |
+### Integration patterns according to data needs
 
-각 항목의 책임:
+이 섹션은 다양한 요구사항(비즈니스 개념 및 비기능 요구사항)에 따른 여러 패턴을 제시합니다. 핵심은 어떤 종류의 통합이 필요하든 관계없이 Core Service의 소비자(예: Customer_CS)는 항상 동일한 유형의 추상화를 얻으며, 외부 레코드 시스템을 알지 못한다는 것입니다.
 
-- **Abstract the data source**: 데이터 소스를 추상화하여 Core Service가 데이터 출처를 알 필요 없게 함
-- **Synchronize data to OutSystems**: 외부 데이터를 OutSystems 엔티티로 동기화
-- **Act as cache to Core Service API**: Core Service가 로컬 캐시를 통해 빠르게 데이터 접근
-- **Error handling**: 외부 시스템 오류 처리 및 재시도 로직
+외부 레코드 시스템에서 데이터를 가져올 때 통합 요구사항을 이해하기 위해 데이터의 성격에 따라 두 가지 유형의 필드로 분류할 수 있습니다.
 
-### Integration patterns according to data needs (데이터 필요에 따른 통합 패턴)
+- **Summary fields**: 항목을 나열하거나 검색하는 데 사용됩니다. 일반적으로 이러한 필드는 시간이 지나도 변하지 않습니다 (예: **Customer name**) 또는 매우 드물게 변경됩니다 (예: **Customer city**).
+- **Detail fields**: 단일 항목의 세부 정보를 표시하는 데만 필요합니다. 이러한 필드는 더 빈번하게 변경되며 복제하기에 민감합니다 (예: **Customer balance**).
 
-패턴 선택은 두 가지 기준으로 결정됩니다.
-
-- **Reading Public 여부**: 데이터를 퍼블릭하게 읽어야 하는지 → Yes이면 캐시 필요
-- **Small Files 여부**: 데이터 크기가 작은지 → Yes이면 Direct Integration 가능
+패턴을 설명하기 전에, 아래 의사결정 트리를 사용하여 데이터 요구사항에 따라 적합한 패턴을 선택하세요. 선택한 경로에서 수집된 모든 패턴을 적용하세요.
 
 ![Integration pattern decision tree](https://success.outsystems.com/TK_Resource/90d69c79-2871-40cf-85b4-75f37d454042)
 
-> 📌 **[다이어그램 삽입: 통합 패턴 전체 플로우차트 (Reading Public → Small Files → 각 패턴 분기)]**
+> 💡 **굵게 표시된 답변이 가장 일반적이고 권장되는 경로입니다.** OutSystems에서 mashup, 검색, scaffolding을 위한 엔티티 제공의 이점을 활용하여 거의 필요하지 않은 나머지 복잡성 없이 구현을 가속화합니다.
 
 ---
 
-### Direct Integration (직접 통합)
+### Direct integration (직접 통합)
 
-외부 시스템을 실시간으로 직접 호출하는 가장 단순한 패턴입니다. Integration Service가 외부 시스템을 직접 호출하고, Core Service는 Integration Service를 통해 데이터를 가져옵니다.
+이 패턴은 Integration Service를 사용하여 서비스를 추상화하면서 외부 시스템과 직접 통합하는 것을 나타냅니다.
 
 ![Direct Integration pattern](https://success.outsystems.com/TK_Resource/459b4387-37d7-487b-a58b-6d0abcc1d242)
 
-**Input API:**
+이 시나리오에서 Customer 데이터는 ERP에서 가져옵니다. **Customer_IS**는 ERP와 인터페이스하여 정보 조회와 트랜잭션 수행 모두를 위한 정규화된 API를 추상화합니다. **Integration Service API**가 유지되는 한 외부 시스템을 변경해도 Core Service에 영향을 주지 않는 유연성을 제공합니다.
 
-- Simple integration API
-- Less impact on source system
-- Not affected by sync
+또한 이 시나리오에서는 **Customer_CS**에 로컬 데이터 복제본을 유지하기 위한 엔티티를 포함하지 않습니다. ERP 외부에 복제 데이터를 유지하지 않는 이유는 비즈니스 제약이거나, 거의 실시간 수요가 지연된 데이터 복제와 양립할 수 없기 때문입니다(정보가 너무 자주 변경됨).
 
-**장점:**
+그러나 이 패턴에는 몇 가지 **한계**가 있습니다.
 
-- 항상 최신 데이터
-- 구현이 단순
+- 데이터를 조회할 때마다 ERP에 추가 부하 발생
+- ERP와의 추가 온라인 통신으로 인한 지연 증가
+- OutSystems Aggregates와 Advanced Queries를 최대한 활용하거나 다른 정보와 결합할 수 없음
+- 다른 데이터 조회가 필요할 때마다 **Customer_IS**를 확장하고 ERP 팀에 새 API를 제공받아야 하는 지속적인 필요성. 이 의존성을 피하기 위해 개발자들이 50개 필드를 반환하는 메서드를 4개만 필요한 경우에도 재사용하는 경향이 있음
 
-**단점:**
-
-- 외부 시스템 장애 시 서비스 중단
-- 성능이 외부 시스템에 종속
-- Slow sync may be OK
-
-**사용 시점:** 데이터를 퍼블릭하게 읽을 필요가 없고, 데이터 크기가 작을 때
+| 장점               | 단점                                    |
+| ------------------ | --------------------------------------- |
+| 데이터가 항상 최신 | 조회 사용 사례별 API 필요 (더 많은 API) |
+|                    | 더 높은 지연                            |
+|                    | 외부 시스템에 더 많은 부하              |
 
 ---
 
-### Cold Cache (Summary Data)
+### Cold Cache Summary Data (콜드 캐시 요약 데이터)
 
-외부 시스템 데이터를 OutSystems 엔티티에 주기적으로 동기화해두는 패턴입니다. Batch 방식으로 정기적으로 외부 데이터를 로컬에 캐시합니다.
+외부 시스템과의 통합 성능을 개선하고 싶을 때, 좋은 출발점은 자주 변경되지 않는 데이터를 캐시하는 것입니다. 이 데이터를 "cold data"라고 하며, 이 캐싱 패턴의 이름이 **Cold Cache**입니다.
 
-![Cold Cache pattern](https://success.outsystems.com/TK_Resource/0efbac8d-c7b6-4c62-9934-9f9b715c2e65)
+Cold Cache는 전체 데이터베이스를 동기화하기에 비용이 너무 많이 들고, 세부 정보는 단일 항목에만 필요한 경우(목록 아님)에 사용됩니다. 요약 데이터는 어떤 항목이든 검색할 수 있도록 존재해야 하지만, 실제로 세부 정보를 확인하는 항목이 10%에 불과할 때 전체 항목을 동기화하는 것은 불필요합니다.
 
-**언제 Cold Cache를 사용하는가?**
+이 패턴이 구현될 때:
 
-아직 통합되지 않은 레거시 시스템이 있을 때 적합합니다.
+- 자주 나열, 조인, 검색되는 요약 데이터만 캐시됩니다 (단일 항목의 전체 세부 정보는 외부 시스템에서 직접 가져올 수 있음)
+- 전체적이고 빈번한 동기화를 피합니다 (요약 정보는 자주 변경되지 않음)
 
-- **Cold Cache to HW Sync**: 하드웨어 동기화를 위한 Cold Cache 사용
-- **Load from the server to sync**: 서버에서 데이터를 로드하여 동기화
+#### Cold Cache with Batch Sync
 
-**장점:**
+Cold Cache를 구현할 때, 가장 간단한 설계 방법은 캐싱 데이터 모델을 만들고 캐시된 데이터를 관리하기 위한 배치 동기화 프로세스를 설정하는 것입니다.
 
-- 외부 시스템 장애에 독립적
-- 성능 향상 (로컬 캐시 조회)
+**Customer_CS**에 로컬 엔티티를 추가하면 Direct Integration 패턴의 한계를 극복하고 실제 완전한 Core Service를 생성합니다.
 
-**단점:**
+![Cold Cache with Batch Sync pattern](https://success.outsystems.com/TK_Resource/0efbac8d-c7b6-4c62-9934-9f9b715c2e65)
 
-- 데이터가 실시간이 아님 (배치 주기만큼 지연)
+Integration Service가 단순하고 안정적으로 됩니다. 다양한 데이터 조회 요구를 위한 수많은 액션을 제공하는 대신, 마지막 동기화 이후 업데이트된 모든 고객 관련 데이터를 가져오는 메서드 하나만 제공하면 됩니다.
 
-**사용 시점:** 데이터를 퍼블릭하게 읽어야 하고, 실시간성이 중요하지 않을 때
+**Customer_CS**는 타이머를 사용하여 Integration Service를 통해 정기적으로 정보를 동기화합니다. 이 동기화는 ERP(데이터의 마스터)에서 Core Service로의 단방향이어야 하며, 복잡한 정보 병합을 피해야 합니다. 반대 방향으로 **Customer_CS**에서 업데이트가 이루어질 때는 먼저 ERP에 성공적으로 동기적으로 커밋되어야 합니다(write-through 정책).
 
----
-
-### Gateway synchronization logic (게이트웨이 동기화 로직)
-
-외부 시스템에서 변경이 발생할 때 OutSystems로 데이터를 push하거나, OutSystems가 주기적으로 변경분(delta)을 pull하는 패턴입니다. 동기화 로직을 Core Service에서 분리하여 별도 모듈로 격리합니다.
-
-![Gateway synchronization logic pattern](https://success.outsystems.com/TK_Resource/fce06b8e-b137-470b-9816-810270bbbf27)
-
-**장점:**
-
-- 외부 시스템 장애에 독립적
-- Cold Cache보다 데이터 신선도 향상
-- Core Service와 동기화 로직의 명확한 분리
-
-**주요 모듈 구성:**
-
-- **Customer_CS**: Core Service — 비즈니스 로직 담당
-- **Customer_Sync**: 동기화 로직 전담 모듈 (Gateway에서 분리)
-- **Customer_IS**: Integration Service — 외부 시스템 wrapping
-
-**Input API / Output API:** 동기화 전후 데이터 흐름 명확히 정의
+| 장점                                       | 단점                         |
+| ------------------------------------------ | ---------------------------- |
+| 더 단순한 API                              | 데이터가 최신이 아닐 수 있음 |
+| OutSystems에서 데이터 mashup 가능          |                              |
+| 소스 시스템에 대한 영향 최소화             |                              |
+| Core Service 고객이 동기화에 영향받지 않음 |                              |
 
 ---
 
-### Distinct real-time sync (개별 실시간 동기화)
+### Isolate synchronization logic (동기화 로직 격리)
 
-IT 요청이 있을 때마다 즉시 동기화하는 패턴입니다. 전체 데이터가 아닌 필요한 특정 레코드만 실시간으로 외부 시스템과 동기화합니다.
+동기화 프로세스가 너무 복잡하고 지속적으로 조정이 필요한 경우, Core Service에서 이를 추출하여 **Customer_CS**를 외부 시스템으로부터 더욱 격리하는 것이 권장됩니다.
 
-**언제 사용하는가?**
+![Isolate synchronization logic pattern](https://success.outsystems.com/TK_Resource/fce06b8e-b137-470b-9816-810270bbbf27)
 
-IT needs a return message — 즉각적인 응답이 필요한 경우에 사용합니다.
+이를 수행하는 또 다른 이유는 동기화가 여러 통합을 오케스트레이션해야 할 때입니다. 예를 들어 Customers가 한 시스템에 저장되고 Customer Contracts가 다른 시스템에 저장된 경우, 계약이 고객을 참조하므로 동기화 시 고객이 계약보다 먼저 동기화되어야 합니다.
 
-![Distinct real-time sync pattern](https://success.outsystems.com/TK_Resource/b694bf68-ebc6-4ec0-a8a0-9692865d5171)
+**Customer_CS**의 소비자는 동기화 코드에 영향을 받을 필요가 없습니다. 또한 향후 ERP가 deprecated되고 OutSystems에 내장된 기능으로 교체되더라도 동기화 코드를 제거하는 것이 영향을 미치지 않습니다.
 
-**특징:**
+이 예시에서 **Customer_Sync**는 Integration Service를 통해 정기적으로 업데이트된 정보를 가져와 **Customer_CS**에 동기화합니다. **Customer_CS**는 여전히 온라인 트랜잭션 수행을 위해 **Customer_IS**를 소비합니다.
 
-- 특정 레코드에 대한 요청 시 실시간으로 외부 시스템과 동기화
-- 전체 동기화가 아닌 필요한 레코드만 처리
-- Sync in a queue request (N queues) — 큐 기반 요청 처리
+---
 
-**장점:**
+### Real-Time Sync (실시간 동기화)
 
-- 항상 최신 특정 레코드 데이터
-- 필요한 데이터만 동기화하여 효율적
+일반적으로 검색, 나열 또는 mashup에 필요한 요약 데이터의 Cold Cache는 매우 안정적이어서 실시간 동기화가 필요하지 않습니다. 그러나 일부 상황에서는 요약 정보에 애플리케이션이 일관되게 작동하기 위해 실시간으로 최신 상태를 유지해야 하는 필드가 포함되어야 합니다 (예: 외부 시스템에서 차량 정보를 조회해야 하고, 자주 변경되는 필드인 각 차량의 현재 위치를 요약 목록에 포함하는 것이 중요한 경우).
 
-**단점:**
+![Real-Time Sync pattern](https://success.outsystems.com/TK_Resource/b694bf68-ebc6-4ec0-a8a0-9692865d5171)
 
-- 외부 시스템 응답 시간에 의존
+실시간 동기화는 외부 레코드 시스템이 OutSystems에 실시간으로 어떤 변경(이 예시에서는 고객 업데이트 또는 삽입)을 알리기 위해 콜백해야 합니다. **API**와 **IS** 모듈이 Core Service를 완전히 격리하여 외부 시스템과 동기화 프로세스에 대해 무관하게 만듭니다.
+
+| 장점                              | 단점                                       |
+| --------------------------------- | ------------------------------------------ |
+| 더 단순한 API                     | 더 많은 시스템 간 의존성                   |
+| OutSystems에서 데이터 mashup 가능 | 큐를 제공하지 않아 변경이 많은 경우 부적합 |
+| 소스 시스템에 대한 영향 최소화    |                                            |
+| 데이터가 항상 최신                |                                            |
+
+---
+
+### Queued real-time sync (큐 기반 실시간 동기화)
+
+기본 실시간 동기화는 구현하기 비교적 간단하지만, 변경이 많은 경우에는 적합하지 않습니다. 이 경우 해결책은 큐를 구현하여 동기화가 병렬로 처리되도록 하는 것입니다.
+
+![Queued real-time sync pattern](https://success.outsystems.com/TK_Resource/3084ac2f-e225-4f8f-940c-5e16bbe877e6)
+
+① 업데이트 요청을 큐에 신속하게 삽입합니다.
+② BPT가 인바운드 메시지에 반응하여 **Customer_CS**를 업데이트합니다.
 
 ---
 
 ### Ordered real-time sync (순서 보장 실시간 동기화)
 
-메시지 순서를 보장하면서 실시간으로 동기화하는 패턴입니다. 메시지 큐 기반으로 처리 순서를 보장합니다.
-
-**언제 사용하는가?**
-
-다음 두 조건 모두 해당할 때 사용합니다.
-
-- If you can't tolerate changes in the order of all messages arriving in the systems (메시지 순서 변경을 허용할 수 없을 때)
-- Create message with async request (비동기 요청으로 메시지 생성)
+외부 시스템이 여러 업데이트 요청을 동시에(예: 멀티스레딩으로) 전송하도록 준비된 경우, 해당 요청들이 올바른 순서로 수신되고 처리된다는 보장이 없습니다. 이 문제를 해결하기 위한 변형입니다.
 
 ![Ordered real-time sync pattern](https://success.outsystems.com/TK_Resource/3084ac2f-e225-4f8f-940c-5e16bbe877e6)
 
-**특징:**
-
-- 메시지 처리 순서 완전 보장
-- 비동기 처리로 외부 시스템 장애에 독립적
-- 큐(Queue)를 통한 메시지 순서 관리
-
-**장점:**
-
-- 데이터 처리 순서 보장
-- 시스템 부하 분산 가능
-
-**단점:**
-
-- 구현 복잡도 높음
-- 즉각적인 응답이 필요한 경우 부적합
-
-**사용 시점:** 데이터 처리 순서가 중요하고, 대용량 메시지를 처리해야 할 때
+① ERP가 시퀀스 제어와 함께 메시지를 전송합니다 (Send message with sequence control).
+② 해당 클러스터를 식별하는 항목을 큐에 넣기 전에 관련된 모든 메시지가 수신되기를 기다립니다 (Wait for all related messages being received, before enqueuing an entry identifying that cluster).
+Light BPT가 올바른 순서로 모든 관련 메시지를 처리하며 인바운드 클러스터에 반응합니다 (Light BPT reacts to inbound cluster, processing all related messages in correct order).
 
 ---
 
-### Final Summary (최종 정리)
+### Lazy Load Details (지연 로딩 세부 정보)
 
-> 📌 **[다이어그램 삽입: 전체 패턴 통합 구조도 — Customer_CS / Customer_IS / CRM / ERP 포함 모든 패턴 비교]**
+위의 패턴들은 **요약 데이터 필드**를 다룰 때의 일반적인 통합 패턴을 다룹니다. 그렇다면 **세부 필드**는 어떻게 할까요? 외부 시스템에서 세부 정보를 가져온 후 재사용하는 빈도가 높다면, Lazy Load 패턴을 설정하는 것이 권장됩니다. 세부 정보를 온디맨드로 가져오는 것은 비용이 너무 많이 들 수 있기 때문입니다.
 
-> 📌 **[다이어그램 삽입: 패턴별 비교표 — Internal data source / Database sync / Full cache with delta sync / Real-time / Ordered real-time 행별 특성 정리]**
+**Lazy Load Details 패턴 구현 방법:**
+
+1. 로컬 캐시에서 데이터를 가져옵니다. 없거나 오래된 경우, 외부 시스템에서 항목 세부 정보를 가져와 캐시합니다(read-through caching).
+   - 캐시된 세부 정보는 만료 날짜를 가질 수 있어, 일정 기간 후 소스에서 강제로 새로고침할 수 있습니다.
+   - 또는 캐시된 데이터를 재사용하기 전에, 외부 레코드 시스템에 해당 정보의 마지막 업데이트 타임스탬프를 요청하여 로컬 타임스탬프와 비교하고 항목이 최신인지 아닌지를 결정합니다.
+2. 요약 데이터도 캐시되는 경우, 세부 정보를 캐시하기 위한 별도의 세부 엔티티를 가집니다.
+3. 공간을 절약하기 위해 오래된 세부 데이터를 정기적으로 정리하는 타이머를 가집니다.
+
+> 💡 **다양한 패턴을 결합하는 것이 일반적입니다: 요약 데이터는 정기적으로 캐시하고, 세부 정보는 필요할 때 lazy load합니다.**
+
+---
+
+### Transparency Service (투명성 서비스)
+
+동일한 유형의 정보에 대해 여러 소스가 있는 경우, 일반적으로 서로 다른 형식과 API를 사용하여 동기화 프로세스가 더 복잡해집니다.
+
+![Diagram showing a transparency service that synchronizes customer data from multiple systems into a single Core Service.](https://success.outsystems.com/TK_Resource/cf96ffe0-e0bd-4763-844a-b1f3a4c967a5)
+
+**Customer_Sync**는 모든 레코드 시스템과의 동기화를 오케스트레이션하여 **Customer_CS**에 단일 Customer 데이터 복제본을 업데이트합니다. 이것이 **투명성 서비스(transparency service)** 를 생성합니다.
+
+이 예시에서 **Customer_CS**는 고객을 업데이트할 수 없습니다. 이 패턴은 정보가 다른 소스에서 오지만 반대 방향으로는 흐르지 않는 가장 일반적인 투명성 서비스입니다. 예시로는 서로 다른 소스/형식에서 오는 전기 또는 통행료 읽기가 있습니다. 로컬에서 수정하거나 고칠 수 있지만, 소스로 다시 전송되지는 않습니다.
+
+그러나 변경 사항을 다시 전송하는 것이 요구사항인 경우, 추가 모듈이 필요합니다. **Customer_IS**는 어떤 인터페이스(또는 드라이버)가 실제로 트랜잭션을 올바른 시스템으로 전송할지 추상화합니다.
+
+![Diagram of a transparency service with an Integration Service routing requests to the correct system driver.](https://success.outsystems.com/TK_Resource/4efb992c-625a-4610-b7d2-2f3468fbefd3)
+
+1. Integration Service는 서로 다른 시스템의 존재를 추상화하여 올바른 드라이버로 요청을 라우팅합니다.
+2. 각 시스템은 서로 다른 드라이버로 인터페이스됩니다. 모든 드라이버는 동일한 시그니처를 가진 API를 제공합니다 (ERP1_Drv, ERP2_Drv, SaaS_Drv → ERP1, ERP2, SaaS).
+3. 서로 다른 고객이 서로 다른 시스템에 있을 수 있습니다.
 
 ---
 
@@ -726,46 +740,701 @@ OutSystems에서 개발자가 다른 테넌트 데이터를 볼 수 있는 유�
 
 ## 8. Microservices Architecture in OutSystems
 
-마이크로서비스 접근 방식에서 아키텍처는 독립적으로 배포 가능한 작은 서비스들로 구성됩니다. 각 서비스는 자체 용량으로 실행되며, 경량 메커니즘으로 통신합니다.
+SOA(Service-Oriented Architecture)에서는 올바른 재사용을 위해 Core Service를 추상화합니다. 그러나 모든 서비스가 OutSystems 애플리케이션과 함께 동일한 환경(설치)에 상주하므로 마이크로서비스 스타일 구현을 구성하지는 않습니다.
 
-마이크로서비스 패러다임에서는:
+마이크로서비스 접근 방식에서는 각 서비스가 자체 인프라를 가지며 분리됩니다. 서비스와의 통신 및 서비스 간 통신은 REST API와 같은 느슨하게 결합된 경량 메커니즘을 통해서만 이루어집니다.
 
-- 독립적인 배포 가능한 서비스를 중심으로 팀을 구성
-- 각 서비스는 독립적으로 확장 가능
-- 서로 다른 언어/기술을 사용해 개별 서비스 구현 가능
-- 최소한의 중앙 집중식 관리
-- 서비스별로 업그레이드 가능
+SOA 접근 방식이 이미 모듈식 접근 방식을 적용하고 있지만, 마이크로서비스는 다음 속성을 향상시킵니다.
+
+- **소비자에 대한 영향이 적은 서비스의 지속적 배포**
+- **더 작은 footprint** — 소비 애플리케이션이 서비스 코드를 포함하지 않음
+- **각 서비스 수요에 따라 독립적으로 확장할 수 있는 덜 모놀리식한 서버**
+
+OutSystems에서 마이크로서비스의 주요 **단점**은 REST API만 소비할 수 있기 때문에 플랫폼의 RAD(Rapid Application Development) 기능을 더 이상 활용할 수 없다는 것입니다.
+
+- Aggregates를 통한 데이터 조회를 가속화하는 엔티티 없음
+- 위의 제한으로 인해 모든 데이터 조회 요구사항은 마이크로서비스 API를 통해 제공되어야 함
+- 서비스가 제공하는 재사용 가능한 Blocks 없음
 
 ![Microservices vs Monolithic architecture](https://success.outsystems.com/TK_Resource/ee7449e9-711b-4665-8abc-d611668f5bcd)
 
-마이크로서비스 접근 방식을 사용하면 아키텍처는 세 가지 인프라로 구성됩니다.
+마이크로서비스 접근 방식을 채택하려면 서비스를 다른 인프라에 배치해야 하며, 애플리케이션은 REST API를 통해 해당 서비스를 소비합니다. OutSystems RAD를 활용하기 위해 마이크로서비스에 대한 애플리케이션 측 확장을 구현할 수 있습니다.
 
-- **External Services** — 외부 소비자 및 시스템
-- **Microservices Infrastructure** — 마이크로서비스 운영 환경
-- **Application Infrastructure** — 애플리케이션 운영 환경
+마이크로서비스를 직접 소비하는 대신, **Extended Services**가 로컬 엔티티에 데이터를 캐싱하고 재사용 가능한 Blocks 또는 복합 비즈니스 로직을 제공함으로써 Core Service를 보강합니다. 이것들은 새로운 것이 아니며, 모든 외부 API에 대한 권장 사항과 일치합니다.
 
-![Microservices extended services](https://success.outsystems.com/TK_Resource/26643e7c-b752-4971-ab46-124ea3da7f36)
+![Extended Services augmenting Core Services](https://success.outsystems.com/TK_Resource/26643e7c-b752-4971-ab46-124ea3da7f36)
 
-### Multiple Microservices Infrastructures
+### Multiple Microservice Infrastructures
 
-![Multiple Microservices Infrastructures](https://success.outsystems.com/TK_Resource/3ca38069-f2d1-4995-9603-508306bded2c)
+일반적으로 마이크로서비스 접근 방식에서는 각 마이크로서비스가 자체 인프라에 상주합니다. 이를 통해 각 인프라가 독립적으로 확장되고 다른 마이크로서비스의 부하에 영향을 받지 않습니다.
 
-각 OutSystems 인프라는 독립적으로 배포 가능합니다. 마이크로서비스당 하나의 OutSystems 환경을 사용할 필요 없이 여러 마이크로서비스를 동일한 인프라에서 호스팅할 수 있습니다. 결과로 발생하는 독립적인 배포 의존성에 주의하세요.
+![Multiple Microservice Infrastructures](https://success.outsystems.com/TK_Resource/3ca38069-f2d1-4995-9603-508306bded2c)
 
-### Central Services for Multiple Substrates
+분리는 독립적인 마이크로서비스 간에 이루어져야 합니다. 두 마이크로서비스가 강한 의존성으로 결합된 경우(예: 많은 데이터베이스 참조) — 플랫폼의 전체 기능을 활용하고 REST API를 통한 통신만의 한계를 피하기 위해 서로 다른 인프라로 분리해서는 안 됩니다.
 
-![Central Services for Multiple Substrates](https://success.outsystems.com/TK_Resource/fb6588ad-5e6d-453d-b241-0ae164617918)
+모든 마이크로서비스를 동일한 인프라에서 시작하고, 자체 인프라와 성장 정책이 필요할 때 격리할 수 있습니다. 이 작업을 용이하게 하려면 공통 인프라를 사용할 때 각 마이크로서비스를 다른 DB Catalog로 격리하세요.
+
+### Central Services for Multiple Subsidiaries
+
+마이크로서비스에 적합한 또 다른 사용 사례는 중앙 서비스 지원입니다: 서로 다른 자회사가 소비해야 하는 중앙 백엔드 시스템을 확장하는 것입니다. 해당 자회사는 자체 설치에서 커스텀 애플리케이션을 구현합니다.
+
+![Central Services for Multiple Subsidiaries](https://success.outsystems.com/TK_Resource/fb6588ad-5e6d-453d-b241-0ae164617918)
 
 ### Microservices Lifecycle — Managing Versions
 
-마이크로서비스를 제공할 때 항상 염두에 두어야 하는 것은 서비스를 버전 관리하는 방법입니다.
+마이크로서비스의 여러 버전은 다음을 통해 유지할 수 있습니다.
 
-- **Add new action**: 새 모듈에 새 액션을 추가하고 모든 소비자에게 배포
-- **Change current API version**: 기존 모듈을 변경하고 모든 소비자에게 배포
-- **Create new API version**: 새 서비스 메서드를 추가하되 모든 소비자가 평가할 수 있도록 유지
+- REST API에서 서비스 정의의 여러 버전 노출
+- 실제 로직을 구현하는 Core 모듈에서 액션의 여러 버전 유지
 
 ![Microservices Lifecycle - Managing Versions](https://success.outsystems.com/TK_Resource/83a1b6f6-936e-451b-911f-d5b9d6e06029)
 
+#### When to Create a New Version
+
+마이크로서비스의 격리를 통해 API 시그니처가 변경되지 않는 한 새 버전을 공개적으로 발표할 필요 없이 지속적으로 배포할 수 있습니다.
+
+API를 변경해야 할 때, 현재 버전을 업데이트할 수 있는지 또는 마이크로서비스 API의 새 버전을 만들어야 하는지 결정해야 합니다.
+
+**현재 API 버전 변경 (Change the current API version)**
+
+다음만 포함되는 경우 현재 버전을 변경합니다.
+
+1. **새 액션을 위한 새 메서드 추가**: 새 메서드가 필요하지 않은 소비자는 REST 서비스 정의를 새로 고칠 필요가 없으므로 영향을 받지 않습니다.
+
+   > ![Diagram showing the addition of a new method to an existing microservices API without impacting consumers.](https://success.outsystems.com/TK_Resource/c8ff4180-6bc6-4168-ab96-299127ec44c1)
+
+2. **모든 소비자에게 강제해야 하는 시그니처 변경**: 현재 버전을 변경하면 소비자가 REST 서비스를 새로 고치도록 강제합니다.
+
+   > ![Diagram illustrating a forced signature change in a microservices API and its impact on consumers.](https://success.outsystems.com/TK_Resource/3034e65b-2976-4698-afb7-c88aacca0db2)
+
+**새 API 버전 생성 (Create new API version)**
+
+메서드 시그니처가 변경되었지만 모든 소비자에게 강제할 수 없어 이전 버전을 하위 호환성 유지를 위해 보존해야 하는 경우 새 버전을 생성합니다. 두 가지 상황이 있습니다.
+
+1. **비파괴적 메서드 시그니처 변경 (Non-disruptive change)**: 새로운 선택적 속성만 포함된 경우 비파괴적입니다.
+
+   > ![Diagram showing a non-disruptive change to a microservices API method signature with optional attributes.](https://success.outsystems.com/TK_Resource/53503623-45e1-48a3-989d-a56be532ef5a)
+
+2. **파괴적 메서드 시그니처 변경 (Disruptive change)**: 새로운 필수 속성이 포함되거나 기존 속성 이름 또는 타입이 변경된 경우 파괴적입니다.
+
+   > ![Diagram depicting a disruptive change to a microservices API method signature, requiring versioning.](https://success.outsystems.com/TK_Resource/b2df3628-8662-4c72-9675-6b167f7ea612)
+
+   이 경우 이전 버전은 새 구현과 호환되지 않으므로 deprecated 처리해야 합니다. 따라서 소비자는 새 버전을 채택하도록 강제됩니다.
+
 ### Infrastructure Scenarios
 
-![Infrastructure Scenarios](https://success.outsystems.com/TK_Resource/15b43ae4-e0ad-4aec-af5c-4540a903f036)
+#### Scenario A — Single Environment for Semi-isolated Microservices
+
+![Scenario A - Single Environment](https://success.outsystems.com/TK_Resource/15b43ae4-e0ad-4aec-af5c-4540a903f036)
+
+서로 다른 마이크로서비스를 격리하려면 마이크로서비스 Zone을 추가하기만 하면 됩니다 (Zone B 예시).
+
+#### Scenario B — Separate Environment for Fully Isolated Microservices
+
+> ![Diagram of separate environments for fully isolated microservices, each with its own infrastructure.](https://success.outsystems.com/TK_Resource/90384efe-a511-4ef0-8b52-c52085798ff4)
+
+서로 다른 마이크로서비스를 격리하려면 마이크로서비스 인프라를 추가하기만 하면 됩니다 (Infrastructure B 예시).
+
+#### Comparing Scenarios
+
+> ![Comparative diagram of single and multiple infrastructure scenarios for microservices.](https://success.outsystems.com/TK_Resource/a4c23004-3e5c-468a-89d7-522d0bc66f4c)
+
+---
+
+## 9. From architecture to development
+
+이 시리즈 문서는 아키텍처 Blueprint를 실제 OutSystems 애플리케이션으로 변환하는 방법에 대한 가이드를 제공합니다.
+
+이 문서(9번)는 애플리케이션의 아키텍처 Blueprint를 설계하는 방법에 집중합니다. 다음 문서(10번)는 Blueprint를 기반으로 애플리케이션 개발을 시작하는 방법을 안내합니다. 코딩 및 아키텍처 모범 사례를 실제로 확인할 수 있는 코드 샘플도 포함되어 있습니다.
+
+### Architecture blueprint design
+
+가상의 고객 **Soccer Fields Fictitious**가 고객들이 온라인으로 축구장을 예약할 수 있는 웹 애플리케이션을 구축하려 한다고 가정합니다.
+
+> ※ 이것은 가상의 클라이언트를 사용한 가상의 사용 사례입니다.
+
+#### Requirements
+
+애플리케이션은 다음을 충족해야 합니다.
+
+- 각 필드 특성(크기, 가용성, 시간당 가격 등)과 함께 축구장 목록을 표시
+- 플레이어가 축구장을 선택하고 예약할 수 있도록 허용
+
+외부 시스템이 축구장 목록을 제공하므로, 실제 필드 관리나 결제 처리는 이 애플리케이션의 범위에 포함되지 않습니다.
+
+#### Architecture design process
+
+아키텍처 설계 프로세스는 3단계 접근 방식을 따릅니다.
+
+> ![Diagram of the architecture design iteration process with three segments: Disclose, Organize, and Assemble.](https://success.outsystems.com/TK_Resource/edf37634-5e44-4b8c-8dbe-d0a22c9de9cb)
+
+> ![Icon representing the Disclose step in the architecture design process.](https://success.outsystems.com/TK_Resource/2a4cea33-5b36-47cd-9ce8-c5a63d75177e)
+>
+> ![Icon representing the Organize step in the architecture design process.](https://success.outsystems.com/TK_Resource/d833b165-4250-445f-8a77-89421b686b4a)
+>
+> ![Icon representing the Assemble step in the architecture design process.](https://success.outsystems.com/TK_Resource/21a923e3-229a-42fb-a838-1180e10e04c5)
+
+세 단계를 여러 번 반복하는 것이 중요합니다. 설계에 만족할 때까지 반복하고, 구현 중에 새로운 개념이나 세부 사항을 발견할 때도 반복합니다. 이 문서는 간단한 애플리케이션을 예시로 하여 단일 반복만 수행합니다.
+
+---
+
+### Disclose (business concepts and integration needs)
+
+먼저 기능적 및 비기능적 요구사항을 이해합니다. 이 단계에서는 가능한 한 많은 사용자 스토리를 파악하고, 통합 요구사항과 UX 기대치를 이해해야 합니다.
+
+**Functional Requirements (기능 요구사항)**
+
+다음 필터를 사용하여 필드를 검색합니다.
+
+- 필드 이름
+- 도시
+- 필드 크기(함께 플레이할 수 있는 플레이어 수)
+
+플레이어가 사용 예정인 필드를 예약할 수 있도록 허용합니다.
+
+**Non Functional Requirements (비기능 요구사항)**
+
+- 시장의 주요 브라우저와 호환
+- REST API를 사용하여 외부 시스템에서 축구장 목록 조회
+- 시스템이 온라인으로 작동하며 UI가 모바일 장치에 적응해야 함
+
+---
+
+### Organize (concepts on architecture canvas)
+
+Architecture Canvas 원칙을 간단히 정리하면 다음과 같습니다.
+
+| 레이어                                                       | 설명                                                         |
+| ------------------------------------------------------------ | ------------------------------------------------------------ |
+| ![Icon for the End User Layer, indicating user interfaces and processes.](https://success.outsystems.com/TK_Resource/36c9078b-c54d-493a-8518-b736e37fa9e8) | 사용자 인터페이스와 프로세스 — Core와 Library를 재사용하여 사용자 스토리를 구현 |
+| ![Icon for the Core Layer, indicating core business services.](https://success.outsystems.com/TK_Resource/07bb59f3-50a1-4f49-9da6-77c4effd8611) | 비즈니스 개념 중심 서비스 — 재사용 가능한 엔티티, 비즈니스 규칙, 비즈니스 위젯 노출 |
+| ![Icon for the Foundation Layer, indicating non-business services.](https://success.outsystems.com/TK_Resource/6b782105-7723-47f3-ab5c-35a0e998212b) | 비즈니스 무관 서비스 — 고도로 재사용 가능한 assets, UI 패턴, 외부 시스템 커넥터, 네이티브 코드 통합으로 프레임워크 확장 |
+
+이 원칙을 기반으로 다음 레이어 Canvas에 애플리케이션의 개념을 배치합니다.
+
+> 📌 **![Architecture Layer Canvas showing the distribution of application components across different layers.](https://success.outsystems.com/TK_Resource/35ed7e75-34dc-42ae-b62d-06dbdbcb0d96)**
+
+식별된 주요 개념들:
+
+- **SoccerFields**: 사용자와의 인터랙션을 담당하는 메인 애플리케이션
+- **Bookings**: 플레이어가 필드를 예약할 수 있게 하는 기능 요구사항
+- **Players**: 애플리케이션을 사용하고 필드를 예약하는 플레이어
+- **Fields**: 검색 및 플레이어의 예약에 사용되는 메인 필드 개념
+- **Fields Integrations**: 외부 시스템에 축구장이 저장되므로 API를 통해 외부 시스템에 연결하는 비기능 요구사항 모듈
+- **Soccer Fields Theme**: 애플리케이션의 look & feel이 모바일 반응형이어야 함
+
+---
+
+### Assemble (matching recommended patterns)
+
+Assemble 단계에서 적용하는 원칙들:
+
+- 개념적으로 관련된 개념은 합칩니다.
+- 너무 복잡하거나 서로 다른 라이프사이클을 가진 경우 개념을 합치지 않습니다.
+- 소비자가 신경 쓰지 않아도 되는 모든 통합 로직에서 재사용 가능한 로직을 격리합니다.
+
+이 원칙들과 아키텍처 패턴 및 모범 사례를 바탕으로 다음 개념에 집중합니다.
+
+**Online (Field_IS 모듈)**
+
+외부 API에 접근하기 위해 **Field_IS** 모듈(IS = Integration Service)을 사용합니다. 이 모듈의 책임은 외부 API를 파악하고 내부 접근을 위해 데이터를 정규화하는 것입니다. 이를 통해 Field_CS와 Field_Sync 모듈은 API의 특수성을 알 필요가 없습니다. 추상화 측면에서 이것은 매우 중요합니다. 이 패턴을 사용하면 애플리케이션이 API 변경에 더 탄력적이며, 데이터 모델에서 원하지 않는 내용을 API에서 흡수할 필요가 없습니다.
+
+**Batch Sync (Field_Sync 모듈)**
+
+필터를 용이하게 하고 더 나은 사용자 경험(성능 향상)을 제공하기 위해 두 번째 패턴을 사용합니다. Field 엔티티의 요약본을 로컬에 유지하여 외부 API에 접근하지 않고 로컬 엔티티에서 주요 검색을 수행할 수 있습니다. 이를 위해 **Field_Sync** 모듈이 하루에 한 번 필드 데이터를 동기화합니다.
+
+> ![Diagram illustrating integration patterns for external master entities with batch sync.](https://success.outsystems.com/TK_Resource/f271e453-2876-4125-87df-50a6c2c4facb)
+
+**Business Logic Module (Booking_BL 모듈)**
+
+복잡성 관리, 조합 또는 자체 라이프사이클을 갖기 위해 비즈니스 로직(Actions) 또는 Core Widgets(Webblocks)를 격리하는 것을 권장합니다. 이 경우 _CW 모듈을 만들 필요가 없었습니다. 나중에 생길 수도 있지만, 지금은 **Booking_BL** 모듈이 필요한 모든 비즈니스 로직을 처리합니다.
+
+이러한 아키텍처 패턴을 적용하고 모듈 이름에 공통 명명 규칙을 사용하면 다음과 같은 모듈 아키텍처 Blueprint가 완성됩니다.
+
+> ![Blueprint diagram showing the architecture of the Soccer Fields application with various modules.](https://success.outsystems.com/TK_Resource/cbd2216f-5e78-4adf-972f-14132212d2c3)
+
+각 모듈의 주요 기능 및 책임:
+
+| 모듈             | 레이어     | 책임                                                         |
+| ---------------- | ---------- | ------------------------------------------------------------ |
+| **SoccerFields** | End-user   | 축구장 검색 및 예약을 위한 모든 화면을 포함하는 End-user 애플리케이션 |
+| **Booking_BL**   | Core       | 예약 관리와 관련된 모든 로직 포함, 필드와 플레이어 개념의 로직을 결합 |
+| **Player_CS**    | Core       | 플레이어 엔티티 및 관련 엔티티를 포함하는 재사용 가능한 Core Service |
+| **Field_CS**     | Core       | 외부 데이터의 로컬 복제본(Cold Cache)을 호스팅하는 재사용 가능한 Core Service — 필드 엔티티 및 관련 엔티티 포함 |
+| **Field_Sync**   | Core       | 외부 시스템에서 Field_CS로 데이터를 동기화하는 로직. Field 엔티티의 요약본만으로 Cold Cache를 유지하는 모든 로직을 격리하는 책임 |
+| **Field_IS**     | Foundation | Field API를 소비하고 정규화하는 기술적 wrapper. 외부 API의 모든 특수성을 추상화하고 파악하는 책임 |
+| **SF_Th**        | Foundation | Soccer Field 애플리케이션의 메인 look & feel을 위한 Theme 모듈 (비기능) |
+
+---
+
+### Application composition
+
+모듈을 만들 때뿐만 아니라 애플리케이션을 만들고 구성하는 방법에 대해서도 아키텍처를 생각해야 합니다.
+
+OutSystems 애플리케이션은 Service Studio에서 정의된 모듈 세트로, LifeTime(OutSystems의 애플리케이션 라이프사이클 관리 도구)의 최소 배포 단위를 구성합니다.
+
+> ![Illustration of the modules of an OutSystems application organized by layer.](https://success.outsystems.com/TK_Resource/f8ea43af-173e-4d71-b791-8f89a035f682)
+
+애플리케이션도 모듈과 마찬가지로 레이어를 준수해야 합니다. 애플리케이션의 레이어를 결정하는 것은 그 안에 있는 모듈들 중 **최상위 레이어**입니다. 즉, Foundation 레이어의 모듈만으로 구성된 애플리케이션은 Foundation Application입니다. Foundation 레이어 모듈도 있지만 하나 이상의 Core 레이어 모듈이 있는 경우 그 애플리케이션은 Core Application입니다.
+
+Soccer Fields App의 애플리케이션 구성은 다음과 같습니다.
+
+> ![Diagram showing the composition of the Soccer Fields application with its modules and layers.](https://success.outsystems.com/TK_Resource/d5f4941c-55b4-4246-9c87-8d9e2ab78c9f)
+
+두 개의 애플리케이션이 있습니다.
+
+- **Soccer Fields App**: SoccerFields 사용자 모듈(사용자가 상호작용하는 프론트엔드 애플리케이션, 스타일 커스터마이징에도 사용)과 SF_Th 모듈(애플리케이션에 커스텀 스타일이 적용된 경우)을 포함합니다.
+- **Field Core Services**: 필드 관련 모든 모듈을 포함합니다.
+
+최종 아키텍처 Blueprint를 실제로 구현하는 방법은 **Developing from the architecture blueprint** 문서(10번)를 참고하세요.
+
+---
+
+### 9-1. Developing from the architecture blueprint
+
+이 문서는 최종 아키텍처 Blueprint를 실제로 구현하는 방법에 집중합니다.
+
+이전 문서(9번)에서 가상 클라이언트 Soccer Fields Fictitious의 사용 사례를 설명했습니다. 이 클라이언트는 고객들이 온라인으로 축구장을 예약할 수 있는 웹 애플리케이션을 구축하려 합니다.
+
+> 진행하기 전에 OutSystems Forge에서 Soccer Fields App resources, Soccer Field Sample API, Field Core Services App을 다운로드하여 개인 환경에 설치하세요.
+
+#### Requirements
+
+애플리케이션은 다음을 충족해야 합니다.
+
+- 각 필드 특성(크기, 가용성, 시간당 가격 등)과 함께 축구장 목록을 표시
+- 플레이어가 축구장을 선택하고 예약할 수 있도록 허용
+- 외부 시스템이 축구장 목록을 제공 (실제 필드 관리나 결제 처리는 이 애플리케이션의 범위 외)
+
+#### Architecture design
+
+이전 문서에서 최종 아키텍처 Blueprint가 완성되었습니다. 아래 이미지는 개발 단계의 시작점을 보여줍니다.
+
+> ![Diagram of the final architecture blueprint for the Soccer Fields application.](https://success.outsystems.com/TK_Resource/d8b783bc-8041-41bf-987e-b0ded139beca)
+
+---
+
+#### Understanding the blueprint (Blueprint 이해)
+
+첫 번째 단계는 Blueprint를 이해하는 것입니다.
+
+- 어떤 요소가 모듈이고 어떤 요소가 애플리케이션인지 식별할 수 있어야 합니다.
+- 각 요소의 성격과 목표를 이해하여 올바른 위치에 코드를 배치할 수 있어야 합니다.
+
+다음은 Blueprint에서 사용하는 표기 규칙입니다.
+
+| 표기                                                         | 의미                                                         |
+| ------------------------------------------------------------ | ------------------------------------------------------------ |
+| ![Icon representing modules in the architecture blueprint with rounded rectangle shapes.](https://success.outsystems.com/TK_Resource/9730e3a0-2252-4fae-8c3d-db93ab8a66b5) | 모듈을 나타냅니다. 색상으로 Architecture Canvas의 레이어를 구분합니다. |
+| ![Icon representing applications in the architecture blueprint with rectangles containing modules.](https://success.outsystems.com/TK_Resource/d34c4ef6-3fc6-4958-a2b8-c5bb6f5a6024) | 애플리케이션을 나타냅니다. 모듈 색상보다 밝은 색이며 아키텍처 레이어를 매핑할 수 있습니다. |
+
+> 📌 **[다이어그램 삽입: Blueprint 표기 규칙 — 모듈(둥근 모서리) vs 애플리케이션(모듈 포함 직사각형) 아이콘 설명]**
+
+아키텍처 설계는 각 요소의 성격을 문서화해야 하며, 아키텍트가 이러한 세부 정보를 추가할 책임이 있습니다.
+
+이 예시에서 두 개의 애플리케이션이 있습니다.
+
+- **Soccer Fields App**: 사용자와 상호작용하고 필드를 예약하는 코드를 포함하는 메인 애플리케이션
+- **Field Core Services**: 외부 소스에서 오는 필드 정보를 연결하고 획득하는 지원 애플리케이션
+
+---
+
+#### Identify module dependencies (모듈 의존성 파악)
+
+아키텍처가 견고한지 확인하고 이를 이해하는 좋은 방법은 모듈 간의 관계와 계층 구조를 파악하는 것입니다. 어떤 모듈이 어디에 의존하는지 이해하는 것은 Discovery tool로 검증하는 Architecture Canvas 검증 규칙을 위반하지 않기 위한 첫 번째 단계입니다.
+
+이것은 특히 Core 레벨에서 중요합니다. 잘못된 의존성은 적절한 개념 격리 부재로 인해 순환 참조를 유발합니다. 이는 코드 리팩토링으로 이어지며 높은 위험과 비용을 수반합니다.
+
+> ![Diagram illustrating the dependencies between modules in the architecture blueprint.](https://success.outsystems.com/TK_Resource/09c95460-bf3a-4d9e-9892-38979e92d6f3)
+
+주요 인사이트:
+
+- **Booking_BL**: 필드와 플레이어라는 두 Core 개념의 조합으로 작동합니다. 이 두 Core 개념은 독립적이며, 플레이어가 필드를 예약할 때 Booking_BL 모듈이 해당 연관을 유지합니다.
+- **Field_CS**: 성능상의 이유로 기존 필드의 로컬 복제본을 포함합니다. Field_Sync 모듈이 이 로컬 복제본을 동기화하며, Field_IS에서 정보를 읽어 Field_CS에 씁니다.
+- **Field_IS**: 외부 REST API에 연결하는 유일한 모듈로, 조회한 정보를 내부 형식으로 정규화합니다. 이 추상화 수준은 시스템이 외부 시스템과 독립적으로 발전하는 데 매우 중요합니다.
+
+아키텍처 Blueprint에 이 정보가 포함되어야 합니다. 없다면 이 작업을 수행하고 아키텍트와 결과를 검증하는 것을 권장합니다.
+
+---
+
+#### Creating the modules and applications (모듈 및 애플리케이션 생성)
+
+이 섹션은 모듈과 애플리케이션 개발 과정을 안내합니다. 첫 번째 단계는 Service Studio를 열어 시작하는 것입니다.
+
+**The end-user application (End-user 애플리케이션)**
+
+아키텍처 설계에 따라 첫 번째 애플리케이션과 모듈을 생성합니다.
+
+1. Service Studio에서 **New Application**을 선택하고 **Web App**을 선택한 후 Liverpool 테마를 선택합니다. 애플리케이션 이름을 "Soccer Fields"로 지정하고 **CREATE APP**을 클릭합니다.
+
+2. End-user 애플리케이션에서 처음 생성할 모듈은 **Theme 모듈**입니다. Theme 모듈을 통해 모범 사례에 따라 애플리케이션의 스타일을 격리하고 커스터마이징할 수 있습니다. 모듈 이름을 **SF_Th**로 변경하고 Responsive 모듈 유형을 선택한 후 **CREATE MODULE** 버튼을 클릭합니다.
+
+   > ![Screenshot of the module creation interface in Service Studio with the module name 'SF_Th' and module type options.](https://success.outsystems.com/TK_Resource/9ddf5b13-d19f-42b6-9332-170c64895b0b)
+
+3. 애플리케이션을 게시하기 전에 Emails와 MainFlow UI 흐름을 삭제합니다. 그 후 **1-Click Publish** 버튼을 클릭합니다.
+
+   > ![Screenshot highlighting the 'Emails' and 'MainFlow' UI flows to be deleted in Service Studio.](https://success.outsystems.com/TK_Resource/1128b71d-128e-4583-add7-4612cbff3a6d)
+
+4. 이 애플리케이션의 프론트엔드 모듈 **SoccerFields**를 생성합니다. 새 Responsive 모듈을 만들고 게시합니다.
+
+   > ![Screenshot showing the process of creating a new front-end module named 'SoccerFields' in Service Studio.](https://success.outsystems.com/TK_Resource/adc2dbd9-c25f-48eb-9bc2-886f1d239208)
+
+5. **SoccerFields** 모듈을 Home 모듈로 설정합니다.
+
+   > ![Screenshot depicting how to set the 'SoccerFields' module as the Home module in Service Studio.](https://success.outsystems.com/TK_Resource/6ac50af4-b79a-456a-930c-fef299b20935)
+
+6. 이 애플리케이션에 **Booking_BL**과 **Player_CS** 두 개의 새 모듈을 추가합니다. **Blank 모듈 유형**을 선택합니다.
+
+   > ![Screenshot of the Service Studio interface for creating a new module named 'Booking_BL'.](https://success.outsystems.com/TK_Resource/8c63a8fe-067c-4d5d-bb30-04ac175b486c)
+
+   > ![Screenshot showing the creation of a new module named 'Player_CS' in Service Studio.](https://success.outsystems.com/TK_Resource/e9e91f66-21c1-4c27-9e81-d027192f146b)
+
+**The core application (Core 애플리케이션)**
+
+"Soccer Fields" 애플리케이션과 동일한 첫 번째 단계를 반복하되, 이번에는 애플리케이션 이름을 **"Field Core Services"** 로 지정합니다.
+
+첫 번째 Core 모듈(**Field_IS**)은 Responsive가 아닌 **Blank 모듈 유형**을 사용합니다. "Field Core Services"는 Core 서비스 애플리케이션이므로 모범 사례에 따라 End-user 화면을 호스팅해서는 안 됩니다.
+
+> ![Screenshot of the Service Studio interface for creating a new module named 'Field_IS'.](https://success.outsystems.com/TK_Resource/ba53e6e8-e465-4281-97b7-da354933a2a9)
+
+**CREATE MODULE**을 클릭한 후 **1-Click Publish** 버튼으로 애플리케이션을 게시합니다. 이후 나머지 모듈인 **Field_CS**와 **Field_Sync**를 동일한 방식으로 생성합니다.
+
+**The foundation application (Foundation 애플리케이션)**
+
+이 샘플에서는 예시의 단순성과 재사용성 요구사항으로 인해 Foundation 애플리케이션이 필요하지 않습니다.
+
+---
+
+#### Implementation (구현)
+
+애플리케이션과 모듈이 생성되었으니 이제 프로그래밍을 시작합니다.
+
+필드 API를 시뮬레이션하기 위해 REST로 통신할 OutSystems 사전 생성 단순 가짜 API 모듈을 사용합니다. API는 매우 단순하며 리소스는 필드 하나뿐입니다. 모든 요청에는 `API_KEY` 요청 헤더에 유효한 키를 전송해야 합니다. 샘플이므로 유효한 API_KEY는 **"outsystems_is_awesome"** 입니다.
+
+**Architecture patterns**
+
+이 사용 사례에는 축구장 정보를 조회하기 위한 중요한 통합 패턴이 있습니다.
+
+> ![Diagram showing the architectural patterns for retrieving soccer field information.](https://success.outsystems.com/TK_Resource/fbb8cf11-9baf-45b7-90ce-cf17a6ddc395)
+
+세 가지 아키텍처 패턴에 집중합니다.
+
+1. **Integration with an External System** — 외부 시스템과의 통합
+2. **Local Replica of data** — 데이터 로컬 복제
+3. **Synchronization of data** — 데이터 동기화
+
+---
+
+**Translating the pattern into code (패턴을 코드로 변환)**
+
+**① Integrating with an External Service (외부 서비스 통합)**
+
+외부 API와의 통합부터 시작합니다. **Field_IS** 모듈이 적합한 위치입니다. 이 모듈은 외부 API를 소비하고 정규화하는 기술적 wrapper이며, 외부 API의 모든 특수성을 추상화하고 격리하는 책임을 집니다.
+
+*Consume the external API (외부 API 소비)*
+
+Field_IS 모듈을 열고 Logic 탭에서 Integrations 폴더 아래 REST 노드를 우클릭하여 **Consume REST API...**를 선택합니다. 팀이 swagger spec을 제공했다고 가정하고, **ADD ALL METHODS**를 클릭하고 swagger 파일의 URL을 입력합니다.
+
+> ![Screenshot of the REST API methods in Service Studio after consuming an external API.](https://success.outsystems.com/TK_Resource/239e75fb-062d-47a3-a32d-452d281dcb9c)
+
+*Send the API Key (API 키 전송)*
+
+외부 API와의 통합을 완료하려면 `API_KEY` 요청 헤더에 유효한 키를 전송해야 합니다. **OnBeforeRequest** 이벤트를 구현합니다. 엔드포인트를 선택하고 On Before Request 속성 옆 드롭다운을 클릭하여 **New OnBeforeRequest**를 선택합니다.
+
+> ![Screenshot showing the process of adding a new 'OnBeforeRequest' event to send the API key.](https://success.outsystems.com/TK_Resource/201afd21-019f-467f-a151-fde47fbf6815)
+
+> ![Screenshot of the logic flow for implementing the 'OnBeforeRequest' event in Service Studio.](https://success.outsystems.com/TK_Resource/3f53820a-c4bd-43c3-b3ec-3158bb356534)
+
+*Retrieve a list of Fields with summary data (요약 데이터로 필드 목록 조회)*
+
+먼저 외부 API에서 가져온 필드 목록을 상위 레이어에 제공하는 액션의 출력이 될 **Field_IS_Summary** 구조체를 생성합니다.
+
+소비자를 외부 데이터 유형으로부터 추상화하고 외부 데이터 유형의 향후 변경 영향을 방지하기 위해, 외부 API가 자동 생성한 구조체를 재사용하지 않습니다.
+
+> ![Screenshot showing the 'Field_IS_Summary' structure with attributes like Name, Dimension, and City.](https://success.outsystems.com/TK_Resource/48b6a827-1b15-4cfb-8a0e-35eb4cfe5385)
+
+**Field_IS_GetSummaryFields** Server Action을 생성하고 Public 속성을 "Yes"로 설정합니다.
+
+> ![Screenshot of the logic flow for creating the 'Field_IS_GetSummaryFields' server action in Service Studio.](https://success.outsystems.com/TK_Resource/7b3e7e96-0b99-4f9b-89c7-a794c4ec65fc)
+
+---
+
+**② Local Replica of data (데이터 로컬 복제)**
+
+성능을 높이고 더 나은 사용자 경험을 제공하기 위해 애플리케이션 측에 데이터 로컬 복제본을 만듭니다.
+
+*Public Local Entity Read only*
+
+**Field_CS**에 새 **Field** 엔티티를 생성합니다. Field_IS summary 구조체가 반환할 모든 필드를 추가합니다. Public 속성과 **Expose Read-only** 속성을 모두 "Yes"로 설정합니다. 외부 모듈이 데이터를 직접 변경하지 못하도록 방지합니다.
+
+> ![Screenshot of the 'Field' entity properties in Service Studio with attributes like Name, Dimension, and City.](https://success.outsystems.com/TK_Resource/c4723be2-e8d3-45e3-9831-312f29b218cf)
+
+*Creation of CRUD actions (CRUD 액션 생성)*
+
+엔티티를 Read-only로 노출하므로 해당 엔티티에 데이터 생성을 중앙화하는 액션이 필요합니다. 이 접근 방식의 또 다른 장점은 로깅 등의 일반 작업을 중앙 액션에 집중할 수 있어 중복 코드를 방지한다는 것입니다.
+
+Server Actions에 새 폴더를 만들고 **Field_Create** 액션을 추가합니다. Field를 입력 파라미터로, Field 식별자 id를 출력 파라미터로 설정합니다. 액션 본문에 CreateOrUpdateField 내부 액션을 드래그하고 마지막에 생성된 id를 반환하는 할당을 추가합니다.
+
+> ![Screenshot showing the creation of CRUD actions for the 'Field' entity in Service Studio.](https://success.outsystems.com/TK_Resource/c5b7452e-c8f3-4e81-a268-efb259bc58c6)
+
+동일한 방법으로 **Field_CreateOrUpdate** 액션을 생성합니다.
+
+---
+
+**③ Synchronization of data (데이터 동기화)**
+
+**Field_Sync** 모듈은 외부 시스템에서 로컬 캐시된 데이터로의 비동기 동기화 로직을 담당합니다. 이 모듈은 Field_IS와 Field_CS를 참조하면서 타이머와 로직을 보유합니다.
+
+특정 시간에 동기화 타이머가 트리거됩니다. 동기화 알고리즘은 Field_IS_GetSummaryFields를 사용하여 외부 시스템에서 필드 데이터의 서브셋을 가져옵니다.
+
+> ![Screenshot of the logic flow for the synchronization algorithm of field data in Service Studio.](https://success.outsystems.com/TK_Resource/90e1c89d-7057-4f47-b92d-33c934f4d4de)
+
+동기화 알고리즘의 주요 단계:
+
+1. **로직 타임아웃 설정 (10분)**: GetSyncFieldCurrPages aggregate가 이전 타이머의 가능한 진행 상황을 가져와 처리를 계속합니다. 타이머 설계 모범 사례를 따르기 위한 것입니다 (절대 타임아웃 없음, 작업 반복 없음, 완전성 보장, 데이터 무결성 보장).
+2. **시작 및 재귀 보장**: 로컬 캐시에 동기화할 데이터가 아직 있는 경우 동기화 흐름의 시작과 재귀를 보장하는 if 로직.
+3. **IS 모듈 액션 호출**: 외부 시스템 호출을 트리거하고 동기화할 레코드 수를 반환합니다.
+4. **결과 순환**: 모든 결과를 순환하며 Field 엔티티에 삽입/업데이트합니다.
+5. **타임아웃 확인**: 로직 타임아웃(10분)에 도달했는지, 처리할 레코드가 더 있는지 확인합니다.
+   - 10분 타임아웃에 도달하지 않고 처리할 레코드가 있으면 알고리즘을 한 번 더 순환합니다.
+   - 10분 로직 타임아웃에 도달했으면 지금까지의 진행 상황을 저장하고 현재 실행을 종료하기 전에 타이머를 다시 깨웁니다 (타이머 모범 사례 보장).
+
+---
+
+## 10. Manage technical debt
+
+AI Mentor Studio(https://aimentorstudio.outsystems.com/)는 OutSystems 기술 부채 모니터링 도구입니다. IT 리더가 크로스 포트폴리오 아키텍처를 시각화하고 문제 영역을 식별하는 동시에, 개발자가 모범 사례를 따르고 일반적인 함정을 피하도록 돕습니다.
+
+조직이 시장 출시 시간을 단축하고 비즈니스 앱을 만드는 비전문 개발자(시민 개발자)의 역량을 강화하려 함에 따라, 기술 부채 관리가 자연스럽게 최우선 과제가 됩니다.
+
+> ℹ️ 이 콘텐츠는 O11의 기술 부채 관리를 위한 AI Mentor Studio를 다룹니다. ODC의 AI 기반 앱 생성은 Build apps with AI를 참고하세요.
+
+AI Mentor Studio를 사용하면 기술 부채를 개발 라이프사이클의 모든 단계에서 효과적으로 관리할 수 있습니다. 부서 애플리케이션이 기업 전체 솔루션으로 발전함에 따라 아무것도 다시 작성할 필요가 없습니다.
+
+아키텍트와 개발팀 리더에게는 통합되고 조직의 기술 부채에 대한 조감도를 제공하여 문제 영역을 파악하고 우선순위를 정할 수 있습니다. 개발자는 어떤 모범 사례가 위반되고 있는지, 그 영향 및 수정 방법에 대한 상세 보고서를 볼 수 있습니다.
+
+타사 도구와 AI Mentor Studio 데이터를 통합하려면 AI Mentor Studio API를 사용하세요.
+
+### What AI Mentor Studio analyzes
+
+AI Mentor Studio는 개발자가 생성한 코드를 분석하고 팀 민첩성에 영향을 줄 수 있는 코드 품질에 대한 인사이트를 제공합니다.
+
+#### Code Analysis
+
+AI Mentor Studio는 생성된 low-code 전반에 걸쳐 사전 정의된 규칙 세트를 실행하여 다음 카테고리에서 코드 패턴을 발견하는 것을 목표로 합니다.
+
+- **Performance** — 성능
+- **Architecture** — 아키텍처
+- **Maintainability** — 유지보수성
+- **Security** — 보안
+
+현재 분석 중인 패턴 목록은 공식 문서에서 확인할 수 있습니다.
+
+#### Architecture auto-classification
+
+AI Mentor Studio는 인프라의 앱 아키텍처 분석에 있어 자급자족합니다. AI 엔진의 도움으로 AI Mentor Studio는 모듈의 코드와 그 관계를 분석하여 전체 아키텍처에서 어디에 맞는지 파악합니다.
+
+AI auto-classification을 통해 AI Mentor Studio에 팩토리를 온보딩하고 올바른 아키텍처 레이어에 맞도록 각 모듈을 분류할 수 있습니다. 이를 통해 다른 모든 코드 분석이 가능해집니다.
+
+기본적으로 AI Mentor Studio에 추가된 모든 새 인프라는 AI auto-classification을 사용합니다. 아키텍처 분류를 위해서는 Discovery가 설치되어 있어야 합니다.
+
+### Access to AI Mentor Studio features
+
+일부 AI Mentor Studio 기능의 가용성 또는 범위는 인프라와 연관된 OutSystems Edition에 따라 다릅니다.
+
+- **Teams**: LifeTime 팀별로 앱 포트폴리오와 기술 부채 결과를 필터링하는 기능은 Standard 및 Enterprise Edition에서 사용 가능합니다.
+- **Date Time Machine**: 기술 부채 분석의 전체 내역을 확인하는 기능은 Standard 및 Enterprise Edition에서 사용 가능합니다. Basic Edition은 1개월의 기술 부채 분석 내역에 접근할 수 있습니다.
+
+Free Edition과 연관된 인프라는 AI Mentor Studio를 사용할 수 없습니다.
+
+### How to access AI Mentor Studio
+
+AI Mentor Studio를 인프라에서 사용하기 전에 IT 사용자가 AI Mentor Studio와 연관되어야 합니다.
+
+AI Mentor Studio에 접근하려면 https://aimentorstudio.outsystems.com/ 으로 이동하여 OutSystems 계정으로 로그인하세요.
+
+> ![img](https://success.outsystems.com/img/Documentation_UI.Gettingstarted__CANuzgqwWsu4b6Di99qi9w.png?CANuzgqwWsu4b6Di99qi9w)
+
+---
+
+## 10-1. How does AI Mentor Studio work
+
+> ℹ️ Architecture Dashboard is now AI Mentor Studio.
+
+AI Mentor Studio는 다음 컴포넌트로 구성됩니다.
+
+- **AI Mentor Studio SaaS**: AI Mentor Studio LifeTime Plugin이 수집한 모든 데이터를 처리하고 표시하는 SaaS(Software as a Service)
+- **AI Mentor Studio LifeTime Plugin**: 데이터를 수집하고 AI Mentor Studio SaaS와 통신하는 환경 probe와 함께 플랫폼 설치(온프레미스 또는 클라우드)에 게시되는 LifeTime 플러그인
+
+### Communication (통신)
+
+AI Mentor Studio 컴포넌트 간의 통신은 인증 방법에 따라 다릅니다.
+
+**OutSystems 계정으로 인증하는 경우**
+
+AI Mentor Studio 플러그인과 AI Mentor Studio SaaS 간의 통신은 항상 플러그인에 의해 시작됩니다. LifeTime 환경의 플러그인에서 AI Mentor Studio SaaS 엔드포인트로의 연결만 보장하면 되므로 연결 요구사항이 줄어듭니다.
+
+> ![Diagram illustrating the communication flow initiated by the AI Mentor Studio plugin when using OutSystems account authentication.](https://success.outsystems.com/TK_Resource/90f9dd40-ca73-4271-a131-36bf1a187ab1)
+
+**IT User 계정으로 인증하는 경우**
+
+AI Mentor Studio가 로그인이 올바른지 확인하기 위해 인프라에 연결할 수 있어야 합니다. 사용자가 인증하거나 개인정보 보호 정책에 동의할 때 AI Mentor Studio SaaS가 AI Mentor Studio 플러그인과 통신해야 합니다. LifeTime probe에서 AI Mentor Studio SaaS 엔드포인트로 데이터를 전송하기 위해 플러그인이 SaaS와 통신해야 합니다. 따라서 IT User 인증을 사용할 때는 AI Mentor Studio SaaS와 플러그인 간의 통신이 **양방향**입니다.
+
+> ![Diagram showing bidirectional communication between AI Mentor Studio SaaS and the AI Mentor Studio plugin when using IT User account authentication.](https://success.outsystems.com/TK_Resource/3a90cbaa-7cea-40d2-b77e-0b6932a4e071)
+
+두 인증 방법 모두 플러그인이 forward proxy를 사용하여 AI Mentor Studio SaaS 엔드포인트에 연결할 수 있습니다.
+
+### Data collected in plugin and sent to SaaS (수집 데이터)
+
+AI Mentor Studio는 인프라에서 다음 데이터를 수집합니다.
+
+- **Platform metamodel data**: 인프라 활성화 코드, 환경 정보(이름 및 Platform Server 버전), 팀, 앱 및 모듈 목록(이름 및 식별자 포함), 플랫폼 구성
+- **모듈 및 의존성 정보**: 코드 분석용
+- **동의 후 수집**: 사용자 정보(이름, 사용자명, 이메일 주소, 사용자 생성일, 마지막 로그인일) 및 LifeTime 권한
+- **선택적**: 아키텍처 분석을 위한 Discovery 스냅샷 데이터(아키텍처 참조, 애플리케이션, 모듈)
+
+### Data in transit (전송 중 데이터)
+
+- 플러그인과 SaaS는 잘 알려진 HTTPS 엔드포인트를 통해 바이너리 형식으로 데이터를 공유합니다.
+- IP 또는 DNS 주소는 전송되지 않습니다.
+- AI Mentor Studio Probe의 올바른 사용을 위해 기본 포트 외에 추가로 열어야 하는 포트가 없습니다.
+- 방화벽 문제가 발생하지 않아야 하지만, AI Mentor Studio 설정 방법에 상세히 설명된 엔드포인트에 접근할 수 있어야 합니다.
+
+### Data at rest in SaaS (SaaS 저장 데이터)
+
+각 설치 데이터는 OutSystems 클라우드에 보관되며 플랫폼의 멀티테넌트 메커니즘을 사용하여 다른 모든 설치와 격리됩니다. 이를 통해 한 설치의 데이터가 다른 설치의 사용자에게 접근되지 않습니다.
+
+보안 및 규정 준수에 대한 자세한 내용은 다음 FAQ 섹션을 참고하세요.
+
+- Security, legal and compliance - registration in AI Mentor Studio
+- Security, legal and compliance - personal information
+
+### Permissions (권한)
+
+IT 사용자가 인프라와 함께 AI Mentor Studio를 사용할 때 갖는 권한은 해당 인프라의 코드 분석 환경에 대해 LifeTime에 설정된 역할과 권한에 따라 달라집니다.
+
+IT 사용자가 코드 분석 환경에 대해 갖는 권한 세트는 할당된 역할의 권한과 역할이 할당되는 방식에 따라 결정됩니다.
+
+역할과 해당 권한은 **기본 역할**, **팀에 대한 역할**, **앱에 대한 역할**로 할당될 수 있습니다.
+
+- 팀에 할당된 역할의 권한은 기본 역할이 할당한 팀의 앱에 대한 권한보다 우선합니다.
+- 앱에 할당된 역할의 권한은 기본 역할 및 팀에 할당된 역할이 특정 앱에 할당한 권한보다 우선합니다.
+
+#### Main features permissions (주요 기능 권한)
+
+**View teams (팀 보기)**
+
+| LifeTime 권한                  | Default role | Assigned to a team | Assigned to an app |
+| ------------------------------ | ------------ | ------------------ | ------------------ |
+| No Access                      | No           |                    |                    |
+| List Application               | No           | Assigned team      | No                 |
+| Monitor and Add Dependencies   |              |                    |                    |
+| Open and Debug Applications    |              |                    |                    |
+| Change and Deploy Applications | Team apps¹   | Assigned team      | No                 |
+| Full Control                   |              |                    |                    |
+
+¹ Team apps: 특정 앱의 권한 수준이 팀에 할당된 것보다 낮게 설정된 경우 제외
+
+**View apps and modules (앱 및 모듈 보기)**
+
+| LifeTime 권한                  | Default role | Assigned to a team | Assigned to an app |
+| ------------------------------ | ------------ | ------------------ | ------------------ |
+| No Access                      | No           |                    |                    |
+| List Application               | All apps¹    | Team apps²         | Assigned apps      |
+| Monitor and Add Dependencies   |              |                    |                    |
+| Open and Debug Applications    |              |                    |                    |
+| Change and Deploy Applications |              |                    |                    |
+| Full Control                   |              |                    |                    |
+
+¹ All apps: 특정 앱(또는 해당 앱에 할당된 팀)의 권한 수준이 역할 또는 팀에 할당된 것보다 낮게 설정된 경우 제외
+² Team apps: 특정 앱의 권한 수준이 팀에 할당된 것보다 낮게 설정된 경우 제외
+
+**Open findings report (결과 보고서 열기)**
+
+| LifeTime 권한                  | Default role | Assigned to a team | Assigned to an app |
+| ------------------------------ | ------------ | ------------------ | ------------------ |
+| No Access                      | No           |                    |                    |
+| List Application               | No           |                    |                    |
+| Monitor and Add Dependencies   |              |                    |                    |
+| Open and Debug Applications    | All apps¹    | Team apps²         | Assigned apps      |
+| Change and Deploy Applications |              |                    |                    |
+| Full Control                   |              |                    |                    |
+
+**Export findings report (결과 보고서 내보내기)**
+
+| LifeTime 권한                  | Default role | Assigned to a team | Assigned to an app |
+| ------------------------------ | ------------ | ------------------ | ------------------ |
+| No Access                      | No           |                    |                    |
+| List Application               | No           |                    |                    |
+| Monitor and Add Dependencies   |              |                    |                    |
+| Open and Debug Applications    | All apps¹    | Team apps²         | Assigned apps      |
+| Change and Deploy Applications |              |                    |                    |
+| Full Control                   |              |                    |                    |
+
+**Resolve findings (결과 해결)**
+
+| LifeTime 권한                  | Default role | Assigned to a team | Assigned to an app |
+| ------------------------------ | ------------ | ------------------ | ------------------ |
+| No Access                      | No           |                    |                    |
+| List Application               | No           |                    |                    |
+| Monitor and Add Dependencies   |              |                    |                    |
+| Open and Debug Applications    | No           |                    |                    |
+| Change and Deploy Applications | All apps¹    | Team apps²         | Assigned apps      |
+| Full Control                   |              |                    |                    |
+
+**Overview dashboard (개요 대시보드)**
+
+| LifeTime 권한                  | Default role | Assigned to a team | Assigned to an app |
+| ------------------------------ | ------------ | ------------------ | ------------------ |
+| No Access                      | No           |                    |                    |
+| List Application               | No           |                    |                    |
+| Monitor and Add Dependencies   |              |                    |                    |
+| Open and Debug Applications    | All apps¹    | Team apps²         | Assigned apps      |
+| Change and Deploy Applications |              |                    |                    |
+| Full Control                   |              |                    |                    |
+
+#### Maintenance and operations permissions (유지보수 및 운영 권한)
+
+**Ignore modules (모듈 무시)**
+
+| LifeTime 권한                        | Default role | Assigned to a team | Assigned to an app     |
+| ------------------------------------ | ------------ | ------------------ | ---------------------- |
+| Open and Debug Applications or lower | No           |                    |                        |
+| Change and Deploy Applications       | All modules¹ | Team modules²      | Assigned app's modules |
+
+¹ All apps: 특정 앱(또는 해당 앱에 할당된 팀)의 권한 수준이 역할 또는 팀에 할당된 것보다 낮게 설정된 경우 제외
+² Team apps: 특정 앱의 권한 수준이 팀에 할당된 것보다 낮게 설정된 경우 제외
+
+**Enable AI auto-classification (AI 자동 분류 활성화)**
+
+| LifeTime 권한                        | Default role | Assigned to a team | Assigned to an app |
+| ------------------------------------ | ------------ | ------------------ | ------------------ |
+| Open and Debug Applications or lower | No           |                    |                    |
+| Change and Deploy Applications       | Yes          | No                 |                    |
+| Full Control                         |              |                    |                    |
+
+**Override module AI auto-classification (모듈 AI 자동 분류 재정의)**
+
+| LifeTime 권한                        | Default role | Assigned to a team | Assigned to an app |
+| ------------------------------------ | ------------ | ------------------ | ------------------ |
+| Open and Debug Applications or lower | No           |                    |                    |
+| Change and Deploy Applications       | All modules¹ | No                 |                    |
+| Full Control                         |              |                    |                    |
+
+¹ All modules: 특정 모듈(또는 해당 모듈에 할당된 팀)의 권한 수준이 역할 또는 팀에 할당된 것보다 낮게 설정된 경우 제외
+
+**Update probes (Probe 업데이트)**
+
+| LifeTime 권한                        | Default role | Assigned to a team | Assigned to an app |
+| ------------------------------------ | ------------ | ------------------ | ------------------ |
+| Open and Debug Applications or lower | No           |                    |                    |
+| Change and Deploy Applications       | Yes          | No                 |                    |
+| Full Control                         |              |                    |                    |
+
+**Manage AI Mentor Studio API**
+
+| LifeTime 권한                        | Default role | Assigned to a team | Assigned to an app |
+| ------------------------------------ | ------------ | ------------------ | ------------------ |
+| Open and Debug Applications or lower | No           |                    |                    |
+| Change and Deploy Applications       | Yes          | No                 |                    |
+| Full Control                         |              |                    |                    |
