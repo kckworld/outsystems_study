@@ -801,11 +801,11 @@ API를 변경해야 할 때, 현재 버전을 업데이트할 수 있는지 또�
 
 1. **새 액션을 위한 새 메서드 추가**: 새 메서드가 필요하지 않은 소비자는 REST 서비스 정의를 새로 고칠 필요가 없으므로 영향을 받지 않습니다.
 
-   > ![Diagram showing the addition of a new method to an existing microservices API without impacting consumers.](https://success.outsystems.com/TK_Resource/c8ff4180-6bc6-4168-ab96-299127ec44c1)
+   > 📌 **[다이어그램 삽입: 새 메서드 추가 — 기존 소비자 영향 없이 새 메서드가 Core 모듈에 추가되는 구조]**
 
 2. **모든 소비자에게 강제해야 하는 시그니처 변경**: 현재 버전을 변경하면 소비자가 REST 서비스를 새로 고치도록 강제합니다.
 
-   > ![Diagram illustrating a forced signature change in a microservices API and its impact on consumers.](https://success.outsystems.com/TK_Resource/3034e65b-2976-4698-afb7-c88aacca0db2)
+   > 📌 **[다이어그램 삽입: 시그니처 변경 — 소비자가 REST 서비스를 강제로 새로 고치는 구조]**
 
 **새 API 버전 생성 (Create new API version)**
 
@@ -813,11 +813,11 @@ API를 변경해야 할 때, 현재 버전을 업데이트할 수 있는지 또�
 
 1. **비파괴적 메서드 시그니처 변경 (Non-disruptive change)**: 새로운 선택적 속성만 포함된 경우 비파괴적입니다.
 
-   > ![Diagram showing a non-disruptive change to a microservices API method signature with optional attributes.](https://success.outsystems.com/TK_Resource/53503623-45e1-48a3-989d-a56be532ef5a)
+   > 📌 **[다이어그램 삽입: 비파괴적 변경 — 선택적 속성 추가로 이전 버전 유지하는 구조]**
 
 2. **파괴적 메서드 시그니처 변경 (Disruptive change)**: 새로운 필수 속성이 포함되거나 기존 속성 이름 또는 타입이 변경된 경우 파괴적입니다.
 
-   > ![Diagram depicting a disruptive change to a microservices API method signature, requiring versioning.](https://success.outsystems.com/TK_Resource/b2df3628-8662-4c72-9675-6b167f7ea612)
+   > 📌 **[다이어그램 삽입: 파괴적 변경 — 필수 속성 추가 또는 속성 변경으로 새 버전 강제 적용하는 구조]**
 
    이 경우 이전 버전은 새 구현과 호환되지 않으므로 deprecated 처리해야 합니다. 따라서 소비자는 새 버전을 채택하도록 강제됩니다.
 
@@ -831,13 +831,13 @@ API를 변경해야 할 때, 현재 버전을 업데이트할 수 있는지 또�
 
 #### Scenario B — Separate Environment for Fully Isolated Microservices
 
-> ![Diagram of separate environments for fully isolated microservices, each with its own infrastructure.](https://success.outsystems.com/TK_Resource/90384efe-a511-4ef0-8b52-c52085798ff4)
+> 📌 **[다이어그램 삽입: Scenario B — 완전히 격리된 마이크로서비스를 위한 별도 환경 구조]**
 
 서로 다른 마이크로서비스를 격리하려면 마이크로서비스 인프라를 추가하기만 하면 됩니다 (Infrastructure B 예시).
 
 #### Comparing Scenarios
 
-> ![Comparative diagram of single and multiple infrastructure scenarios for microservices.](https://success.outsystems.com/TK_Resource/a4c23004-3e5c-468a-89d7-522d0bc66f4c)
+> 📌 **[다이어그램 삽입: Comparing Scenarios — 단일 인프라 vs 다중 인프라 비교 구조]**
 
 ---
 
@@ -866,13 +866,13 @@ API를 변경해야 할 때, 현재 버전을 업데이트할 수 있는지 또�
 
 아키텍처 설계 프로세스는 3단계 접근 방식을 따릅니다.
 
-> ![Diagram of the architecture design iteration process with three segments: Disclose, Organize, and Assemble.](https://success.outsystems.com/TK_Resource/edf37634-5e44-4b8c-8dbe-d0a22c9de9cb)
+![Diagram of the architecture design iteration process with three segments: Disclose, Organize, and Assemble.](https://success.outsystems.com/TK_Resource/edf37634-5e44-4b8c-8dbe-d0a22c9de9cb)
 
-> ![Icon representing the Disclose step in the architecture design process.](https://success.outsystems.com/TK_Resource/2a4cea33-5b36-47cd-9ce8-c5a63d75177e)
->
-> ![Icon representing the Organize step in the architecture design process.](https://success.outsystems.com/TK_Resource/d833b165-4250-445f-8a77-89421b686b4a)
->
-> ![Icon representing the Assemble step in the architecture design process.](https://success.outsystems.com/TK_Resource/21a923e3-229a-42fb-a838-1180e10e04c5)
+| 아이콘                                                       | 단계                                                   | 설명                               |
+| ------------------------------------------------------------ | ------------------------------------------------------ | ---------------------------------- |
+| ![Icon representing the Disclose step in the architecture design process.](https://success.outsystems.com/TK_Resource/2a4cea33-5b36-47cd-9ce8-c5a63d75177e) | **Disclose** business concepts and integration needs   | 비즈니스 개념과 통합 요구사항 발굴 |
+| ![Icon representing the Organize step in the architecture design process.](https://success.outsystems.com/TK_Resource/d833b165-4250-445f-8a77-89421b686b4a) | **Organize** concepts on the architecture Layer canvas | 아키텍처 레이어 Canvas에 개념 배치 |
+| ![Icon representing the Assemble step in the architecture design process.](https://success.outsystems.com/TK_Resource/21a923e3-229a-42fb-a838-1180e10e04c5) | **Assemble** Matching recommended patterns             | 권장 패턴에 맞게 조합              |
 
 세 단계를 여러 번 반복하는 것이 중요합니다. 설계에 만족할 때까지 반복하고, 구현 중에 새로운 개념이나 세부 사항을 발견할 때도 반복합니다. 이 문서는 간단한 애플리케이션을 예시로 하여 단일 반복만 수행합니다.
 
@@ -1198,6 +1198,8 @@ Server Actions에 새 폴더를 만들고 **Field_Create** 액션을 추가합�
 5. **타임아웃 확인**: 로직 타임아웃(10분)에 도달했는지, 처리할 레코드가 더 있는지 확인합니다.
    - 10분 타임아웃에 도달하지 않고 처리할 레코드가 있으면 알고리즘을 한 번 더 순환합니다.
    - 10분 로직 타임아웃에 도달했으면 지금까지의 진행 상황을 저장하고 현재 실행을 종료하기 전에 타이머를 다시 깨웁니다 (타이머 모범 사례 보장).
+
+---
 
 ---
 
