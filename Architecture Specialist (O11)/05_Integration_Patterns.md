@@ -1,63 +1,86 @@
 # OutSystems Architecture Specialist (O11)
 ## Integration Patterns for Core Services Abstraction
+1단원 벼락치기 정리노트
+
+> 🌐 **스타일 버전 (색상/다이어그램 완전 재현):**
+> [htmlpreview로 보기](https://htmlpreview.github.io/?https://github.com/kckworld/outsystems_study/blob/main/Architecture%20Specialist%20(O11)/05_Integration_Patterns.html)
 
 ---
 
-## 핵심 결론
-
-이 단원은 외부 시스템(ERP, CRM 등)을 OutSystems Core Service에서 직접 알지 못하게 숨기고, **Integration Service**가 외부 API/프로토콜/인증/오류 처리를 감싸도록 만드는 설계 패턴이다.
-
-시험에서는:
-- "누가 외부 시스템을 알아야 하는가?"
-- "Integration Service를 시스템별로 만들지 개념별로 만들지"
-- "캐시/동기화/직접연계 중 무엇을 선택할지"
-
-를 묻는다.
+> **원장님 핵심 결론**
+> 이 단원은 외부 시스템(ERP, CRM 등)을 OutSystems Core Service에서 직접 알지 못하게 숨기고, Integration Service가 외부 API/프로토콜/인증/오류 처리를 감싸도록 만드는 설계 패턴입니다. 시험에서는 "누가 외부 시스템을 알아야 하는가?", "Integration Service를 시스템별로 만들지 개념별로 만들지", "캐시/동기화/직접연계 중 무엇을 선택할지"를 묻습니다.
 
 ---
 
-## 1. 왜 Integration Pattern이 필요한가?
+## 1. 원문 문장과 한글 해석
+
+| English sentence | Korean meaning |
+|---|---|
+| Why do you need integration patterns? | 왜 Integration Pattern이 필요한가? |
+| System independence | 외부 시스템이 바뀌어도 내부 Core 개념과 Consumer에 주는 영향을 줄이는 독립성 |
+| Extensibility, normalization, and optimization | 추가 정보/비즈니스 규칙 확장, 표현 표준화, 캐시를 통한 성능 개선 |
+| Integration Service per independent concept, not a single integration point per external system | 외부 시스템별 단일 연계점이 아니라, 독립적인 업무 개념별 Integration Service를 둔다 |
+| Consumers of the core service always get the same type of abstraction | Core Service 소비자는 외부 시스템 종류와 무관하게 동일한 추상화 계층만 본다 |
+
+---
+
+## 2. 왜 Integration Pattern이 필요한가?
+
+자료의 시작 질문은 "Why do you need integration patterns?"입니다. 외부 system of record에서 마스터 데이터를 조회하거나 트랜잭션을 수행해야 할 때, 처음부터 패턴을 정해야 나중에 시스템 변경, 성능 문제, 중복 구현을 줄일 수 있습니다.
 
 | 필요성 | 설명 | 시험 키워드 |
 |---|---|---|
-| System independence | ERP/CRM 같은 외부 시스템이 바뀌어도 Core Service와 화면 앱이 크게 흔들리지 않게 한다 | resilient to external changes |
-| Extensibility | 외부 데이터에 내부 비즈니스 규칙이나 보완 정보를 더할 수 있다 | extend the concept |
-| Normalization | 외부 시스템마다 다른 구조를 내부 표준 구조로 변환한다 | normalize representations |
-| Optimization | 필요한 경우 캐시/동기화를 사용해 성능을 개선한다 | cache information |
+| System independence | ERP/CRM 같은 외부 시스템이 바뀌어도 Core Service와 화면 앱이 크게 흔들리지 않게 한다. | resilient to external changes |
+| Extensibility | 외부 데이터에 내부 비즈니스 규칙이나 보완 정보를 더할 수 있다. | extend the concept |
+| Normalization | 외부 시스템마다 다른 구조를 내부 표준 구조로 변환한다. | normalize representations |
+| Optimization | 필요한 경우 캐시/동기화를 사용해 성능을 개선한다. | cache information |
 
-> ⚠️ **시험 함정:** "외부 시스템이 ERP 하나니까 End-user 앱에서 ERP API를 직접 호출하면 된다"는 식의 답은 위험하다. 외부 연계를 Integration Service로 감싸고, Core Service 소비자는 외부 시스템을 몰라야 한다.
+> ⚠️ 시험 함정: "외부 시스템이 ERP 하나니까 End-user 앱에서 ERP API를 직접 호출하면 된다"는 식의 답은 위험합니다. 이 단원은 외부 연계를 Integration Service로 감싸고, Core Service 소비자는 외부 시스템을 몰라야 한다는 방향입니다.
 
 ---
 
-## 2. Core Service와 Integration Service 구조
+## 3. 그림 1 - Core Service와 Integration Service
 
 ```mermaid
 graph TD
-  A[Consumer<br/>End-user / Other Core] --> B[Customer_CS<br/>Core Service]
-  B --> C[Customer_IS<br/>Integration Service]
-  C --> D[(ERP)]
-  C --> E[(CRM)]
+  Consumer["Consumer\n(End-user / Other Core)"]
+  CS["① Customer_CS\nCore Service\n(System agnostic)"]
+  IS["② Customer_IS\nIntegration Service\n(API 추상화 / 기술 요구사항 처리)"]
+  ERP[("ERP")]
+  CRM[("CRM")]
+
+  Consumer --> CS
+  CS --> IS
+  IS --> ERP
+  IS --> CRM
 ```
+
+*그림 1. Customer_CS(Core Service) → Customer_IS(Integration Service) → ERP/CRM 구조*
+
+그림은 Customer라는 독립적인 업무 개념을 기준으로 Customer_CS와 Customer_IS를 분리합니다. Customer_CS는 Core Service이고, Customer_IS는 Integration Service입니다.
 
 | 구성요소 | 역할 | 시험 판단 |
 |---|---|---|
-| Customer_CS | Core Service. Customer라는 업무 개념을 내부에 안정적으로 제공한다 | Consumer가 사용하는 추상화 계층 |
-| Customer_IS | Integration Service. ERP/CRM API를 감싸고 내부 구조에 맞게 변환한다 | 외부 시스템 복잡성을 숨김 |
+| Customer_CS | Core Service. Customer라는 업무 개념을 내부에 안정적으로 제공한다. | Consumer가 사용하는 추상화 계층 |
+| Customer_IS | Integration Service. ERP/CRM API를 감싸고 내부 구조에 맞게 변환한다. | 외부 시스템 복잡성을 숨김 |
 | ERP / CRM | 실제 System of Record 또는 외부 시스템 | Core/End-user가 직접 알아야 할 대상이 아님 |
 
-| 번호 | 역할 | 한글 설명 |
+| 번호 | 영어 원문 요지 | 한글 설명 |
 |---|---|---|
-| 1 - Core Service | Extend the original service / System agnostic | Core Service는 원래 서비스를 확장하고, 특정 외부 시스템에 종속되지 않아야 한다 |
-| 2 - Integration Service | Abstracts the original API(s) | 원 API를 감싸고, 내부 구조와 개념에 맞게 매핑한다 |
-| 2 - Integration Service | Hide the integration type | REST, SOAP, HTTP request, file upload 등 세부 연계 방식을 숨긴다 |
-| 2 - Integration Service | Cope with technical requirements | 인증, 권한, 에러 처리, 감사 로그 같은 기술 요구사항을 처리한다 |
+| 1 - Core Service | Extend the original service / System agnostic | Core Service는 원래 서비스를 확장하고, 특정 외부 시스템에 종속되지 않아야 합니다. |
+| 2 - Integration Service | Abstracts the original API(s) | Integration Service는 원 API를 감싸고, 내부 구조와 개념에 맞게 매핑합니다. |
+| 2 - Integration Service | Hide the integration type | REST, SOAP, HTTP request, file upload 등 세부 연계 방식을 숨깁니다. |
+| 2 - Integration Service | Cope with technical requirements | 인증, 권한, 에러 처리, 감사 로그 같은 기술 요구사항을 처리합니다. |
 
 ---
 
-## 3. 핵심 원칙 - 시스템별이 아니라 개념별 Integration Service
+## 4. 핵심 원칙 - 시스템별이 아니라 개념별 Integration Service
 
-**영어 시험 문장:**
-> The idea is to have an Integration Service per independent concept and **not** a single integration point per external system.
+자료의 가장 중요한 문장은 "Integration Service per independent concept, not a single integration point per external system"입니다.
+
+> *영어 시험 문장: The idea is to have an Integration Service per independent concept and not a single integration point per external system.*
+
+한글 해석: 외부 시스템마다 하나의 연계 모듈을 만드는 것이 아니라, Customer, Product, Order 같은 독립적인 업무 개념별로 Integration Service를 만든다는 뜻입니다.
 
 | 나쁜 설계 | 좋은 설계 |
 |---|---|
@@ -67,17 +90,23 @@ graph TD
 
 ---
 
-## 4. Integration Wrapper Canvas
+## 5. 그림 2 - Integration Wrapper Canvas
 
 ```mermaid
-graph TD
-  A[Integration Service Wrapper] --> B[Validation / Security logic<br/>입력값 일관성 확인, 사용자 권한 확인]
-  A --> C[Authentication logic<br/>토큰, credential 처리]
-  A --> D[Map inputs<br/>내부 입력을 외부 API 형식으로 변환]
-  A --> E[Call and audit the external API<br/>외부 API 호출 및 audit trail]
-  A --> F[Normalize error handling<br/>외부 오류 메시지를 내부 방식으로 표준화]
-  A --> G[Normalize outputs<br/>외부 응답을 내부 표준 구조로 변환]
+flowchart TD
+  A["Validation / Security logic\n입력값 일관성 확인, 사용자 권한 확인"]
+  B["Authentication logic\n외부 API 호출에 필요한 인증 정보 준비"]
+  C["Map inputs\n내부 입력을 외부 API 형식으로 변환"]
+  D["Call and audit the external API\n외부 API 호출 및 감사 기록"]
+  E["Normalize error handling\n외부 오류 메시지를 내부 방식으로 표준화"]
+  F["Normalize outputs\n외부 응답을 내부 표준 구조로 변환"]
+
+  A --> B --> C --> D --> E --> F
 ```
+
+*그림 2. 외부 시스템 호출을 감쌀 때 고려해야 할 Wrapper Canvas*
+
+Integration Service는 외부 시스템 호출을 감싸는 Wrapper 역할을 합니다. 단순히 API를 호출하는 것만이 아니라, 입력 검증부터 인증, 입력 매핑, API 호출 감사, 오류 정규화, 출력 정규화까지 담당합니다.
 
 | Wrapper Canvas 항목 | 한글 설명 | 시험 포인트 |
 |---|---|---|
@@ -91,42 +120,49 @@ graph TD
 
 ---
 
-## 5. Summary fields와 Detail fields
+## 6. Summary fields와 Detail fields
+
+Integration Pattern 선택은 데이터 성격에 따라 달라집니다. 자료에서는 외부 시스템에서 가져오는 필드를 Summary fields와 Detail fields로 나눕니다.
 
 | 구분 | 영어 설명 | 한글 설명 | 예시 |
 |---|---|---|---|
 | Summary fields | Used for listing or searching entries | 목록/검색에 필요한 필드. 보통 자주 바뀌지 않음 | Customer name, Customer city |
 | Detail fields | Only required to display details for a single entry | 단건 상세 화면에서만 필요한 필드. 자주 바뀌거나 민감할 수 있음 | Customer balance |
 
-> ⚠️ **시험 함정:** 상세 필드가 민감하거나 자주 바뀌면 무조건 복제하지 않고 **Lazy Load Details** 같은 패턴을 고려한다.
+> ⚠️ 시험 함정: 목록/검색에 필요한 Summary fields와 단건 상세에 필요한 Detail fields를 구분해야 합니다. 상세 필드가 민감하거나 자주 바뀌면 무조건 복제하지 않고 Lazy Load Details 같은 패턴을 고려합니다.
 
 ---
 
-## 6. Integration Pattern 결정 트리
+## 7. 그림 3 - 데이터 필요에 따른 Integration Pattern 결정 트리
 
 ```mermaid
 flowchart TD
-  A([Start]) --> B{OutSystems 안에<br/>데이터 복제해도 되는가?}
-  B -->|Yes - 검색/매시업 필요| C[Cold Cache Summary]
-  B -->|No| X[Direct Integration]
+  Start([시작]) --> Q1{"OutSystems 안에\n데이터 복제해도 되는가?"}
+  Q1 -->|Yes| Cold["Cold Cache Summary"]
+  Q1 -->|No| Direct["Direct Integration"]
 
-  C --> D{Summary fields가<br/>자주 변하는가?}
-  D -->|No| E[Batch Sync]
-  D -->|Yes| F{변경량이<br/>많은가?}
-  F -->|No| G[Real-time Sync]
-  F -->|Yes| H{순서가<br/>중요한가?}
-  H -->|No| I[Queued Real-time Sync]
-  H -->|Yes| J[Ordered Real-time Sync]
+  Cold --> Q2{"Summary fields가\n자주 변하는가?"}
+  Q2 -->|No| Batch["Batch Sync"]
+  Q2 -->|Yes| Q3{"변경량이\n많은가?"}
+  Q3 -->|No| Realtime["Real-time Sync"]
+  Q3 -->|Yes| Q4{"순서가\n중요한가?"}
+  Q4 -->|No| Queued["Queued Real-time Sync"]
+  Q4 -->|Yes| Ordered["Ordered Real-time Sync"]
 
-  G --> K{Detail fields가 반복 사용되고<br/>가져오는 비용이 큰가?}
-  K -->|Yes| L[Lazy Load Details]
-  K -->|No| M{같은 개념에<br/>소스가 여러 개인가?}
-  X --> M
-  M -->|Yes| N[Transparency Service]
-  M -->|No| O([End])
-  L --> O
-  N --> O
+  Realtime --> Q5{"Detail fields가 반복 사용되고\n가져오는 비용이 큰가?"}
+  Q5 -->|Yes| Lazy["Lazy Load Details"]
+  Q5 -->|No| Q6{"같은 개념에\n소스가 여러 개인가?"}
+
+  Direct --> Q6
+  Q6 -->|Yes| Trans["Transparency Service"]
+  Q6 -->|No| End([끝])
+  Lazy --> End
+  Trans --> End
 ```
+
+*그림 3. 데이터 필요에 따라 Direct Integration, Cache, Sync, Lazy Load, Transparency Service를 선택하는 결정 트리*
+
+결정 트리는 먼저 "OutSystems 안에 일부 데이터를 복제해도 되는가?"를 묻습니다. 복제할 필요가 없거나 복제하면 안 되면 Direct Integration으로 갑니다. 복제해도 되고 검색/매시업이 필요하면 Cold Cache Summary부터 시작해 Summary 데이터 변경 빈도, 변경량, 순서 중요도를 보고 Batch Sync, Real-time Sync, Queued Real-time Sync, Ordered Real-time Sync를 선택합니다.
 
 | 패턴 | 언제 선택? | 핵심 의미 |
 |---|---|---|
@@ -141,32 +177,104 @@ flowchart TD
 
 ---
 
-## 7. Direct Integration 패턴
-
-**영어 시험 문장:**
-> This pattern simply represents a direct integration with the external system, **using the Integration Service for service abstraction**.
+## 8. 그림 4 - Direct Integration 시작 부분
 
 ```mermaid
 graph TD
-  A[Customer_CS<br/>Core Service] --> B[Customer_IS<br/>Integration Service]
-  B --> C[(ERP)]
+  CS["Customer_CS\nCore Service"]
+  IS["Customer_IS\nIntegration Service"]
+  ERP[("ERP")]
+
+  CS --> IS --> ERP
 ```
 
-> ⚠️ Direct Integration은 외부 시스템과 직접 통신하는 패턴이지만, End-user나 Core Consumer가 ERP를 직접 호출한다는 뜻이 **아니다**. Integration Service를 통한 service abstraction이 핵심.
+*그림 4. Direct Integration 패턴: 외부 시스템을 직접 연계하되, Integration Service를 통해 추상화*
+
+Direct Integration은 외부 시스템과 직접 통신하는 패턴이지만, 중요한 점은 End-user나 Core Consumer가 ERP를 직접 호출한다는 뜻이 아닙니다. 자료 문장처럼 "using the Integration Service for service abstraction"이 핵심입니다.
+
+> *영어 시험 문장: This pattern simply represents a direct integration with the external system, using the Integration Service for service abstraction.*
+
+한글 해석: 이 패턴은 외부 시스템과 직접 통합하는 것을 의미하지만, 서비스 추상화를 위해 Integration Service를 사용한다는 뜻입니다.
 
 ---
 
-## 8. 시험 함정 포인트
+## 9. 시험 함정 포인트
 
-- Integration Service는 외부 시스템별 하나가 아니라 **독립적인 업무 개념별**로 설계하는 것이 기본 방향이다.
-- Core Service 소비자는 ERP/CRM 같은 외부 system of record를 몰라야 한다.
-- REST/SOAP/File Upload 같은 기술 방식은 Integration Service 안에 숨긴다.
-- Customer_IS처럼 특정 업무 개념에 묶이면 Core Services Abstraction 맥락에서 Core 개념 주변에 배치될 수 있다.
-- Summary fields는 목록/검색용이고, Detail fields는 단건 상세용이다. 이 구분이 동기화 패턴 선택 기준이다.
+- Integration Service는 외부 시스템별 하나가 아니라 독립적인 업무 개념별로 설계하는 것이 기본 방향입니다.
+- Core Service 소비자는 ERP/CRM 같은 외부 system of record를 몰라야 합니다.
+- REST/SOAP/File Upload 같은 기술 방식은 Integration Service 안에 숨깁니다.
+- Foundation/Core 구분 문제에서는 Integration Service가 기술 래퍼처럼 보이지만, Customer_IS처럼 특정 업무 개념에 묶이면 Core Services Abstraction 맥락에서 Core 개념 주변에 배치될 수 있습니다.
+- Summary fields는 목록/검색용이고, Detail fields는 단건 상세용입니다. 이 구분이 동기화 패턴 선택 기준입니다.
+- Exception handling은 보통 caller가 담당하지만, 통합 예외 메시지 표준화나 audit 목적으로 Integration Wrapper에서 고려할 수 있습니다.
 
 ---
 
-## 9. 30초 복습 키워드
+## 10. 실전 문제풀이
+
+**Q1.** Which statement best describes the purpose of an Integration Service?
+> Q1. Integration Service의 목적을 가장 잘 설명하는 것은?
+- A. To let end-user applications directly call ERP APIs
+- B. To abstract external APIs and map them to internal structures and concepts
+- C. To replace all Core Services
+- D. To store all external data permanently in OutSystems
+
+<details>
+<summary>정답 보기</summary>
+
+✅ **정답: B** — Integration Service는 외부 API를 추상화하고 내부 구조/개념에 맞게 매핑합니다.
+
+</details>
+
+**Q2.** The recommended approach is to create Integration Services based on:
+> Q2. Integration Service를 만드는 권장 방식의 기준은?
+- A. Each external system only / B. Each screen flow / C. Each independent business concept / D. Each database table name
+
+<details>
+<summary>정답 보기</summary>
+
+✅ **정답: C** — 자료의 핵심 문장: Integration Service per independent concept.
+
+</details>
+
+**Q3.** Summary fields are mainly used for:
+> Q3. Summary fields는 주로 무엇에 사용되는가?
+- A. Listing or searching entries / B. Displaying sensitive details of a single record / C. Handling API credentials / D. Normalizing exception messages
+
+<details>
+<summary>정답 보기</summary>
+
+✅ **정답: A** — Summary fields는 목록/검색용입니다.
+
+</details>
+
+**Q4.** Which concern belongs in the Integration Wrapper Canvas?
+> Q4. Integration Wrapper Canvas에 속하는 항목은?
+- A. Map inputs / B. Design the app logo / C. Create end-user menus / D. Define screen navigation
+
+<details>
+<summary>정답 보기</summary>
+
+✅ **정답: A** — Wrapper Canvas에는 validation, authentication, map inputs, call/audit API, normalize errors/outputs 등이 들어갑니다.
+
+</details>
+
+**Q5.** Direct Integration means:
+> Q5. Direct Integration이 의미하는 것은?
+- A. The screen directly calls the external API
+- B. The Core Service must know ERP-specific structures
+- C. The Integration Service abstracts a direct call to the external system
+- D. All data must be cached in OutSystems
+
+<details>
+<summary>정답 보기</summary>
+
+✅ **정답: C** — 직접 연계라도 Integration Service를 통한 service abstraction이 핵심입니다.
+
+</details>
+
+---
+
+## 11. 30초 복습 키워드
 
 | 키워드 | 바로 떠올릴 내용 |
 |---|---|
@@ -177,37 +285,3 @@ graph TD
 | Detail fields | 단건 상세용, 민감/빈번 변경 가능, Lazy Load 고려 |
 | Direct Integration | 복제하지 않지만 Integration Service로 추상화 |
 | Transparency Service | 동일 개념에 여러 데이터 소스가 있을 때 소스 차이 숨김 |
-
----
-
-## 10. 실전 문제
-
-**Q1.** Which statement best describes the purpose of an Integration Service?
-- A. To let end-user applications directly call ERP APIs
-- **B. To abstract external APIs and map them to internal structures and concepts** ✅
-- C. To replace all Core Services
-- D. To store all external data permanently in OutSystems
-
-**Q2.** The recommended approach is to create Integration Services based on:
-- A. Each external system only
-- B. Each screen flow
-- **C. Each independent business concept** ✅
-- D. Each database table name
-
-**Q3.** Summary fields are mainly used for:
-- **A. Listing or searching entries** ✅
-- B. Displaying sensitive details of a single record
-- C. Handling API credentials
-- D. Normalizing exception messages
-
-**Q4.** Which concern belongs in the Integration Wrapper Canvas?
-- **A. Map inputs** ✅
-- B. Design the app logo
-- C. Create end-user menus
-- D. Define screen navigation
-
-**Q5.** Direct Integration means:
-- A. The screen directly calls the external API
-- B. The Core Service must know ERP-specific structures
-- **C. The Integration Service abstracts a direct call to the external system** ✅
-- D. All data must be cached in OutSystems
