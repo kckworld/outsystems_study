@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Integration Patterns for Core Services Abstraction</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@600;700&display=swap');
+  :root{--blue:#5bb8d4;--orange:#e8a84c;--green:#5aaa78;--red:#c0392b;--border:#ddd;--text:#222;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Noto Sans KR',sans-serif;font-size:14px;line-height:1.75;color:var(--text);background:#fff;max-width:860px;margin:0 auto;padding:48px 40px 80px;}
+  .doc-title{text-align:center;margin-bottom:6px;}
+  .doc-title h1{font-family:'Noto Serif KR',serif;font-size:20px;font-weight:700;color:var(--red);line-height:1.4;}
+  .doc-subtitle{text-align:center;font-size:13px;color:#666;margin-bottom:24px;}
+  .conclusion-box{background:#fff3e0;border:1px solid #ff9800;border-radius:6px;padding:16px 20px;margin:0 0 24px;}
+  .info-box{background:#fff8e1;border:1px solid #f9a825;border-radius:4px;padding:14px 18px;margin-bottom:20px;}
+  .info-box strong{color:#e65100;display:block;margin-bottom:4px;font-size:13px;}
+  .memo-box{background:#f0fbe6;border:1px solid #7cb342;border-radius:4px;padding:14px 18px;margin:16px 0;}
+  .memo-box strong{color:#33691e;display:block;margin-bottom:4px;font-size:13px;}
+  .warn-box{background:#fdecea;border-left:4px solid var(--red);padding:12px 16px;margin:16px 0;font-size:13px;border-radius:0 4px 4px 0;}
+  .eng-box{background:#e8eaf6;border-left:4px solid #3949ab;padding:12px 16px;margin:14px 0;font-size:13px;border-radius:0 4px 4px 0;}
+  .compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0;}
+  .compare-bad{background:#fdecea;border:1px solid #ef9a9a;border-radius:4px;padding:12px 14px;}
+  .compare-bad strong{color:var(--red);display:block;margin-bottom:6px;}
+  .compare-good{background:#e8f5e9;border:1px solid #a5d6a7;border-radius:4px;padding:12px 14px;}
+  .compare-good strong{color:#1b5e20;display:block;margin-bottom:6px;}
+  h2{font-family:'Noto Serif KR',serif;font-size:17px;font-weight:700;color:var(--red);border-bottom:2px solid var(--red);padding-bottom:6px;margin:32px 0 14px;}
+  h3{font-size:14px;font-weight:700;color:#555;margin:20px 0 8px;border-left:3px solid var(--orange);padding-left:10px;}
+  p{margin-bottom:12px;}
+  ul,ol{padding-left:20px;margin-bottom:12px;}
+  li{margin-bottom:4px;}
+  .diagram-wrap{border:1px solid #ccc;border-radius:6px;padding:20px;margin:16px 0 4px;background:#fafafa;overflow-x:auto;}
+  .diagram-caption{text-align:center;font-size:12px;color:#666;font-style:italic;margin:4px 0 18px;}
+  table{width:100%;border-collapse:collapse;margin:12px 0 18px;font-size:13px;}
+  th{background:#555;color:#fff;padding:8px 12px;text-align:left;font-weight:700;}
+  td{padding:8px 12px;border:1px solid var(--border);vertical-align:top;}
+  tr:nth-child(even) td{background:#f5f5f5;}
+  .qa-block{border:1px solid #e0e0e0;border-radius:6px;padding:16px 18px;margin-bottom:16px;}
+  .qa-q{font-weight:700;margin-bottom:8px;}
+  .qa-ko{font-size:12px;color:#666;margin-bottom:8px;font-style:italic;}
+  .qa-opts{padding-left:0;list-style:none;}
+  .qa-opts li{padding:4px 0;border-bottom:1px dashed #eee;}
+  .qa-opts li:last-child{border-bottom:none;}
+  .qa-answer{background:#e8f5e9;border-left:3px solid #388e3c;padding:8px 12px;font-size:13px;margin-top:10px;border-radius:0 3px 3px 0;}
+  hr{border:none;border-top:1px solid var(--border);margin:28px 0;}
+  .kw-table td:first-child{font-weight:700;color:#1a73b5;white-space:nowrap;}
+</style>
+</head>
+<body>
+
+<div class="doc-title">
+  <h1>OutSystems Architecture Specialist (O11)<br>Integration Patterns for Core Services Abstraction</h1>
+</div>
+<div class="doc-subtitle">1단원 벼락치기 정리노트</div>
+
+<div class="conclusion-box">
+  <strong style="color:#e65100;font-weight:700;display:block;margin-bottom:8px;">원장님 핵심 결론</strong>
+  이 단원은 외부 시스템(ERP, CRM 등)을 OutSystems Core Service에서 직접 알지 못하게 숨기고, Integration Service가 외부 API/프로토콜/인증/오류 처리를 감싸도록 만드는 설계 패턴입니다. 시험에서는 "누가 외부 시스템을 알아야 하는가?", "Integration Service를 시스템별로 만들지 개념별로 만들지", "캐시/동기화/직접연계 중 무엇을 선택할지"를 묻습니다.
+</div>
+
+<hr>
+
+<h2>1. 원문 문장과 한글 해석</h2>
+<table>
+  <tr><th>English sentence</th><th>Korean meaning</th></tr>
+  <tr><td>Why do you need integration patterns?</td><td>왜 Integration Pattern이 필요한가?</td></tr>
+  <tr><td>System independence</td><td>외부 시스템이 바뀌어도 내부 Core 개념과 Consumer에 주는 영향을 줄이는 독립성</td></tr>
+  <tr><td>Extensibility, normalization, and optimization</td><td>추가 정보/비즈니스 규칙 확장, 표현 표준화, 캐시를 통한 성능 개선</td></tr>
+  <tr><td>Integration Service per independent concept, not a single integration point per external system</td><td>외부 시스템별 단일 연계점이 아니라, 독립적인 업무 개념별 Integration Service를 둔다</td></tr>
+  <tr><td>Consumers of the core service always get the same type of abstraction</td><td>Core Service 소비자는 외부 시스템 종류와 무관하게 동일한 추상화 계층만 본다</td></tr>
+</table>
+
+<hr>
+
+<h2>2. 왜 Integration Pattern이 필요한가?</h2>
+<p>자료의 시작 질문은 "Why do you need integration patterns?"입니다. 외부 system of record에서 마스터 데이터를 조회하거나 트랜잭션을 수행해야 할 때, 처음부터 패턴을 정해야 나중에 시스템 변경, 성능 문제, 중복 구현을 줄일 수 있습니다.</p>
+<table>
+  <tr><th>필요성</th><th>설명</th><th>시험 키워드</th></tr>
+  <tr><td>System independence</td><td>ERP/CRM 같은 외부 시스템이 바뀌어도 Core Service와 화면 앱이 크게 흔들리지 않게 한다.</td><td>resilient to external changes</td></tr>
+  <tr><td>Extensibility</td><td>외부 데이터에 내부 비즈니스 규칙이나 보완 정보를 더할 수 있다.</td><td>extend the concept</td></tr>
+  <tr><td>Normalization</td><td>외부 시스템마다 다른 구조를 내부 표준 구조로 변환한다.</td><td>normalize representations</td></tr>
+  <tr><td>Optimization</td><td>필요한 경우 캐시/동기화를 사용해 성능을 개선한다.</td><td>cache information</td></tr>
+</table>
+<div class="warn-box">시험 함정: "외부 시스템이 ERP 하나니까 End-user 앱에서 ERP API를 직접 호출하면 된다"는 식의 답은 위험합니다. 이 단원은 외부 연계를 Integration Service로 감싸고, Core Service 소비자는 외부 시스템을 몰라야 한다는 방향입니다.</div>
+
+<hr>
+
+<h2>3. 그림 1 - Core Service와 Integration Service</h2>
+
+<div class="diagram-wrap">
+  <svg viewBox="0 0 560 240" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:560px;display:block;margin:0 auto;">
+    <defs>
+      <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#555"/></marker>
+    </defs>
+    <!-- Customer_CS -->
+    <rect x="60" y="20" width="140" height="50" fill="#fdf0d8" stroke="#e8a84c" stroke-width="2" rx="4"/>
+    <text x="130" y="42" font-family="sans-serif" font-size="13" font-weight="bold" fill="#a06800" text-anchor="middle">Customer_CS</text>
+    <text x="130" y="58" font-family="sans-serif" font-size="11" fill="#a06800" text-anchor="middle">Core Service</text>
+    <circle cx="196" cy="35" r="10" fill="#e8a84c"/>
+    <text x="196" y="40" font-family="sans-serif" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">1</text>
+    <!-- Arrow CS → IS -->
+    <line x1="130" y1="70" x2="130" y2="110" stroke="#555" stroke-width="1.5" marker-end="url(#arr)"/>
+    <!-- Customer_IS -->
+    <rect x="60" y="110" width="140" height="50" fill="#d9f0e3" stroke="#5aaa78" stroke-width="2" rx="4"/>
+    <text x="130" y="132" font-family="sans-serif" font-size="13" font-weight="bold" fill="#1e6e3e" text-anchor="middle">Customer_IS</text>
+    <text x="130" y="148" font-family="sans-serif" font-size="11" fill="#1e6e3e" text-anchor="middle">Integration Service</text>
+    <circle cx="196" cy="125" r="10" fill="#5aaa78"/>
+    <text x="196" y="130" font-family="sans-serif" font-size="12" font-weight="bold" fill="#fff" text-anchor="middle">2</text>
+    <!-- Arrows IS → ERP, CRM -->
+    <line x1="100" y1="160" x2="60" y2="196" stroke="#555" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="160" y1="160" x2="200" y2="196" stroke="#555" stroke-width="1.5" marker-end="url(#arr)"/>
+    <!-- ERP -->
+    <rect x="10" y="196" width="80" height="36" fill="#eee" stroke="#aaa" stroke-width="1.5" rx="4"/>
+    <text x="50" y="218" font-family="sans-serif" font-size="12" font-weight="bold" fill="#555" text-anchor="middle">ERP</text>
+    <!-- CRM -->
+    <rect x="160" y="196" width="80" height="36" fill="#eee" stroke="#aaa" stroke-width="1.5" rx="4"/>
+    <text x="200" y="218" font-family="sans-serif" font-size="12" font-weight="bold" fill="#555" text-anchor="middle">CRM</text>
+    <!-- Annotations -->
+    <text x="290" y="40" font-family="sans-serif" font-size="11" font-weight="bold" fill="#a06800">1- Core Service</text>
+    <text x="290" y="56" font-family="sans-serif" font-size="11" fill="#555">Extend the original service</text>
+    <text x="290" y="71" font-family="sans-serif" font-size="11" fill="#555">System agnostic (resilient to external changes)</text>
+    <text x="290" y="96" font-family="sans-serif" font-size="11" font-weight="bold" fill="#1e6e3e">2- Integration Service</text>
+    <text x="290" y="112" font-family="sans-serif" font-size="11" fill="#555">Abstracts the original API(s), matching to internal</text>
+    <text x="290" y="126" font-family="sans-serif" font-size="11" fill="#555">structures and concepts</text>
+    <text x="290" y="142" font-family="sans-serif" font-size="11" fill="#555">Hide the integration type (SOAP, REST, XIF, HTTP...)</text>
+    <text x="290" y="158" font-family="sans-serif" font-size="11" fill="#555">Cope with technical requirements (access credentials,</text>
+    <text x="290" y="172" font-family="sans-serif" font-size="11" fill="#555">authorization, error handling, integration auditing, ...)</text>
+    <!-- bottom note -->
+    <text x="10" y="240" font-family="sans-serif" font-size="11" fill="#555" font-style="italic">The idea is to have an Integration Service per independent concept (e.g. Customers)</text>
+  </svg>
+</div>
+<div class="diagram-caption">그림 1. Customer_CS(Core Service) → Customer_IS(Integration Service) → ERP/CRM 구조</div>
+
+<p>그림은 Customer라는 독립적인 업무 개념을 기준으로 Customer_CS와 Customer_IS를 분리합니다. Customer_CS는 Core Service이고, Customer_IS는 Integration Service입니다.</p>
+
+<table>
+  <tr><th>구성요소</th><th>역할</th><th>시험 판단</th></tr>
+  <tr><td>Customer_CS</td><td>Core Service. Customer라는 업무 개념을 내부에 안정적으로 제공한다.</td><td>Consumer가 사용하는 추상화 계층</td></tr>
+  <tr><td>Customer_IS</td><td>Integration Service. ERP/CRM API를 감싸고 내부 구조에 맞게 변환한다.</td><td>외부 시스템 복잡성을 숨김</td></tr>
+  <tr><td>ERP / CRM</td><td>실제 System of Record 또는 외부 시스템</td><td>Core/End-user가 직접 알아야 할 대상이 아님</td></tr>
+</table>
+<table>
+  <tr><th>번호</th><th>영어 원문 요지</th><th>한글 설명</th></tr>
+  <tr><td>1 - Core Service</td><td>Extend the original service / System agnostic</td><td>Core Service는 원래 서비스를 확장하고, 특정 외부 시스템에 종속되지 않아야 합니다.</td></tr>
+  <tr><td>2 - Integration Service</td><td>Abstracts the original API(s)</td><td>Integration Service는 원 API를 감싸고, 내부 구조와 개념에 맞게 매핑합니다.</td></tr>
+  <tr><td>2 - Integration Service</td><td>Hide the integration type</td><td>REST, SOAP, HTTP request, file upload 등 세부 연계 방식을 숨깁니다.</td></tr>
+  <tr><td>2 - Integration Service</td><td>Cope with technical requirements</td><td>인증, 권한, 에러 처리, 감사 로그 같은 기술 요구사항을 처리합니다.</td></tr>
+</table>
+
+<hr>
+
+<h2>4. 핵심 원칙 - 시스템별이 아니라 개념별 Integration Service</h2>
+<p>자료의 가장 중요한 문장은 "Integration Service per independent concept, not a single integration point per external system"입니다.</p>
+<div class="eng-box">
+  영어 시험 문장: The idea is to have an Integration Service per independent concept and not a single integration point per external system.
+</div>
+<p>한글 해석: 외부 시스템마다 하나의 연계 모듈을 만드는 것이 아니라, Customer, Product, Order 같은 독립적인 업무 개념별로 Integration Service를 만든다는 뜻입니다.</p>
+<div class="compare-grid">
+  <div class="compare-bad">
+    <strong>나쁜 설계</strong>
+    <ul style="padding-left:16px;margin:0;font-size:13px;">
+      <li>ERP_IS 하나에 Customer, Product, Order를 모두 넣음</li>
+      <li>Consumer가 ERP/CRM 차이를 알아야 함</li>
+      <li>Products 변경이 Customers 소비자에게 영향 가능</li>
+    </ul>
+  </div>
+  <div class="compare-good">
+    <strong>좋은 설계</strong>
+    <ul style="padding-left:16px;margin:0;font-size:13px;">
+      <li>Customer_IS, Product_IS, Order_IS처럼 개념별 분리</li>
+      <li>Consumer는 Customer_CS만 보고 외부 시스템을 모름</li>
+      <li>각 개념이 독립 lifecycle을 가짐</li>
+    </ul>
+  </div>
+</div>
+
+<hr>
+
+<h2>5. 그림 2 - Integration Wrapper Canvas</h2>
+
+<div class="diagram-wrap">
+  <svg viewBox="0 0 420 260" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:420px;display:block;margin:0 auto;">
+    <!-- Canvas box -->
+    <rect x="20" y="10" width="260" height="240" fill="#fff" stroke="#ccc" stroke-width="1.5" rx="4"/>
+    <text x="150" y="30" font-family="sans-serif" font-size="11" font-weight="bold" fill="#333" text-anchor="middle">Integration Wrapper Canvas:</text>
+    <!-- Items -->
+    <rect x="30" y="40" width="210" height="28" fill="#f5f5f5" stroke="#ddd" stroke-width="1" rx="2"/>
+    <text x="135" y="58" font-family="sans-serif" font-size="11" fill="#333" text-anchor="middle">Validation / Security logic</text>
+    <rect x="30" y="74" width="210" height="28" fill="#f5f5f5" stroke="#ddd" stroke-width="1" rx="2"/>
+    <text x="135" y="92" font-family="sans-serif" font-size="11" fill="#333" text-anchor="middle">Authentication logic</text>
+    <rect x="30" y="108" width="210" height="28" fill="#f5f5f5" stroke="#ddd" stroke-width="1" rx="2"/>
+    <text x="135" y="126" font-family="sans-serif" font-size="11" fill="#333" text-anchor="middle">Map inputs</text>
+    <rect x="30" y="142" width="210" height="28" fill="#f5f5f5" stroke="#ddd" stroke-width="1" rx="2"/>
+    <text x="135" y="160" font-family="sans-serif" font-size="11" fill="#333" text-anchor="middle">Call and audit the external API</text>
+    <rect x="30" y="176" width="210" height="28" fill="#f5f5f5" stroke="#ddd" stroke-width="1" rx="2"/>
+    <text x="135" y="194" font-family="sans-serif" font-size="11" fill="#333" text-anchor="middle">Normalize error handling</text>
+    <rect x="30" y="210" width="210" height="28" fill="#f5f5f5" stroke="#ddd" stroke-width="1" rx="2"/>
+    <text x="135" y="228" font-family="sans-serif" font-size="11" fill="#333" text-anchor="middle">Normalize outputs</text>
+    <!-- Exception handling sidebar -->
+    <rect x="242" y="108" width="30" height="130" fill="#c0392b" rx="2"/>
+    <text x="257" y="180" font-family="sans-serif" font-size="9" fill="#fff" text-anchor="middle" transform="rotate(-90,257,180)">Exception handling</text>
+  </svg>
+</div>
+<div class="diagram-caption">그림 2. 외부 시스템 호출을 감쌀 때 고려해야 할 Wrapper Canvas</div>
+
+<p>Integration Service는 외부 시스템 호출을 감싸는 Wrapper 역할을 합니다. 단순히 API를 호출하는 것만이 아니라, 입력 검증부터 인증, 입력 매핑, API 호출 감사, 오류 정규화, 출력 정규화까지 담당합니다.</p>
+<table>
+  <tr><th>Wrapper Canvas 항목</th><th>한글 설명</th><th>시험 포인트</th></tr>
+  <tr><td>Validation / Security logic</td><td>입력값 일관성 확인, 사용자 권한 확인</td><td>권한/검증은 호출 전 체크</td></tr>
+  <tr><td>Authentication logic</td><td>외부 API 호출에 필요한 인증 정보 준비</td><td>토큰, credential 처리</td></tr>
+  <tr><td>Map inputs</td><td>내부 입력을 외부 API 형식으로 변환</td><td>내부 모델과 외부 모델 분리</td></tr>
+  <tr><td>Call and audit the external API</td><td>외부 API 호출 및 필요 시 감사 기록</td><td>audit trail</td></tr>
+  <tr><td>Normalize error handling</td><td>외부 API 성공/오류 메시지를 내부 방식으로 표준화</td><td>오류 메시지 그대로 반환은 위험</td></tr>
+  <tr><td>Normalize outputs</td><td>외부 응답을 내부 표준 구조로 변환</td><td>Consumer가 외부 구조를 몰라야 함</td></tr>
+  <tr><td>Exception handling</td><td>보통 caller가 예외를 처리하지만, 통합 예외 메시지 표준화에 사용 가능</td><td>무조건 여기서 다 처리한다는 의미는 아님</td></tr>
+</table>
+
+<hr>
+
+<h2>6. Summary fields와 Detail fields</h2>
+<p>Integration Pattern 선택은 데이터 성격에 따라 달라집니다. 자료에서는 외부 시스템에서 가져오는 필드를 Summary fields와 Detail fields로 나눕니다.</p>
+<table>
+  <tr><th>구분</th><th>영어 설명</th><th>한글 설명</th><th>예시</th></tr>
+  <tr><td>Summary fields</td><td>Used for listing or searching entries</td><td>목록/검색에 필요한 필드. 보통 자주 바뀌지 않음</td><td>Customer name, Customer city</td></tr>
+  <tr><td>Detail fields</td><td>Only required to display details for a single entry</td><td>단건 상세 화면에서만 필요한 필드. 자주 바뀌거나 민감할 수 있음</td><td>Customer balance</td></tr>
+</table>
+<div class="warn-box">시험 함정: 목록/검색에 필요한 Summary fields와 단건 상세에 필요한 Detail fields를 구분해야 합니다. 상세 필드가 민감하거나 자주 바뀌면 무조건 복제하지 않고 Lazy Load Details 같은 패턴을 고려합니다.</div>
+
+<hr>
+
+<h2>7. 그림 3 - 데이터 필요에 따른 Integration Pattern 결정 트리</h2>
+
+<div class="diagram-wrap">
+  <svg viewBox="0 0 680 420" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:680px;display:block;margin:0 auto;">
+    <defs>
+      <marker id="dt" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#555"/></marker>
+    </defs>
+    <!-- Start -->
+    <circle cx="340" cy="18" r="10" fill="#555"/>
+    <line x1="340" y1="28" x2="340" y2="50" stroke="#555" stroke-width="1.5" marker-end="url(#dt)"/>
+    <!-- Decision 1 -->
+    <rect x="170" y="50" width="340" height="40" fill="#fff" stroke="#888" stroke-width="1.5" rx="20"/>
+    <text x="340" y="68" font-family="sans-serif" font-size="11" fill="#333" text-anchor="middle">It's Ok to replicate (some) data and need</text>
+    <text x="340" y="83" font-family="sans-serif" font-size="11" fill="#333" text-anchor="middle">to search or mashup that data in OutSystems?</text>
+    <!-- Yes branch -->
+    <line x1="400" y1="90" x2="400" y2="120" stroke="#555" stroke-width="1.5" marker-end="url(#dt)"/>
+    <text x="408" y="108" font-family="sans-serif" font-size="10" fill="#388e3c">Yes</text>
+    <!-- Cold Cache Summary -->
+    <rect x="310" y="120" width="180" height="30" fill="#fff3e0" stroke="#ff9800" stroke-width="1.5" rx="4"/>
+    <text x="400" y="139" font-family="sans-serif" font-size="11" font-weight="bold" fill="#e65100" text-anchor="middle">Cold Cache Summary</text>
+    <!-- Decision: Summary fields change frequently? -->
+    <line x1="400" y1="150" x2="400" y2="172" stroke="#555" stroke-width="1.5" marker-end="url(#dt)"/>
+    <rect x="270" y="172" width="260" height="28" fill="#fff" stroke="#888" stroke-width="1" rx="14"/>
+    <text x="400" y="190" font-family="sans-serif" font-size="10" fill="#333" text-anchor="middle">Summary fields change frequently?</text>
+    <!-- No → Batch Sync -->
+    <line x1="400" y1="200" x2="400" y2="222" stroke="#555" stroke-width="1.5" marker-end="url(#dt)"/>
+    <text x="408" y="214" font-family="sans-serif" font-size="10" fill="#c0392b">No</text>
+    <rect x="330" y="222" width="140" height="28" fill="#d6eef6" stroke="#5bb8d4" stroke-width="1.5" rx="4"/>
+    <text x="400" y="240" font-family="sans-serif" font-size="11" font-weight="bold" fill="#1a6a8a" text-anchor="middle">Batch Sync</text>
+    <!-- Yes → High volume? -->
+    <line x1="530" y1="186" x2="560" y2="186" stroke="#555" stroke-width="1.5" marker-end="url(#dt)"/>
+    <text x="536" y="180" font-family="sans-serif" font-size="10" fill="#388e3c">Yes</text>
+    <rect x="560" y="172" width="110" height="28" fill="#fff" stroke="#888" stroke-width="1" rx="14"/>
+    <text x="615" y="190" font-family="sans-serif" font-size="10" fill="#333" text-anchor="middle">High volume of changes?</text>
+    <!-- No → Real-time Sync -->
+    <line x1="615" y1="200" x2="615" y2="222" stroke="#555" stroke-width="1.5" marker-end="url(#dt)"/>
+    <text x="620" y="214" font-family="sans-serif" font-size="10" fill="#c0392b">No</text>
+    <rect x="545" y="222" width="140" height="28" fill="#d6eef6" stroke="#5bb8d4" stroke-width="1.5" rx="4"/>
+    <text x="615" y="240" font-family="sans-serif" font-size="11" font-weight="bold" fill="#1a6a8a" text-anchor="middle">Real-time Sync</text>
+    <!-- Yes → Update order relevant? -->
+    <!-- Lazy load -->
+    <line x1="400" y1="250" x2="400" y2="272" stroke="#555" stroke-width="1.5" marker-end="url(#dt)"/>
+    <rect x="240" y="272" width="320" height="28" fill="#fff" stroke="#888" stroke-width="1" rx="14"/>
+    <text x="400" y="290" font-family="sans-serif" font-size="10" fill="#333" text-anchor="middle">Are detail fields often reused during a period and are they costly to obtain?</text>
+    <!-- Yes → Lazy load details -->
+    <line x1="400" y1="300" x2="300" y2="322" stroke="#555" stroke-width="1.5" marker-end="url(#dt)"/>
+    <text x="340" y="316" font-family="sans-serif" font-size="10" fill="#388e3c">Yes</text>
+    <rect x="200" y="322" width="140" height="28" fill="#d6eef6" stroke="#5bb8d4" stroke-width="1.5" rx="4"/>
+    <text x="270" y="340" font-family="sans-serif" font-size="11" font-weight="bold" fill="#1a6a8a" text-anchor="middle">Lazy load details</text>
+    <!-- No branch from Decision 1 → Direct Integration -->
+    <line x1="280" y1="70" x2="80" y2="340" stroke="#555" stroke-width="1.5" marker-end="url(#dt)"/>
+    <text x="155" y="200" font-family="sans-serif" font-size="10" fill="#c0392b">No</text>
+    <rect x="10" y="340" width="140" height="28" fill="#d9f0e3" stroke="#5aaa78" stroke-width="1.5" rx="4"/>
+    <text x="80" y="358" font-family="sans-serif" font-size="11" font-weight="bold" fill="#1e6e3e" text-anchor="middle">Direct Integration</text>
+    <!-- More than one source? -->
+    <line x1="200" y1="354" x2="330" y2="375" stroke="#555" stroke-width="1.5" marker-end="url(#dt)"/>
+    <rect x="330" y="365" width="200" height="28" fill="#fff" stroke="#888" stroke-width="1" rx="14"/>
+    <text x="430" y="383" font-family="sans-serif" font-size="10" fill="#333" text-anchor="middle">More than one source for the same concept?</text>
+    <!-- Yes → Transparency service -->
+    <line x1="430" y1="393" x2="350" y2="408" stroke="#555" stroke-width="1.5" marker-end="url(#dt)"/>
+    <text x="380" y="405" font-family="sans-serif" font-size="10" fill="#388e3c">Yes</text>
+    <rect x="240" y="404" width="150" height="28" fill="#fff3e0" stroke="#ff9800" stroke-width="1.5" rx="4"/>
+    <text x="315" y="422" font-family="sans-serif" font-size="11" font-weight="bold" fill="#e65100" text-anchor="middle">Transparency service</text>
+    <!-- End -->
+    <circle cx="540" cy="420" r="8" fill="#555"/>
+  </svg>
+</div>
+<div class="diagram-caption">그림 3. 데이터 필요에 따라 Direct Integration, Cache, Sync, Lazy Load, Transparency Service를 선택하는 결정 트리</div>
+
+<p>결정 트리는 먼저 "OutSystems 안에 일부 데이터를 복제해도 되는가?"를 묻습니다. 복제할 필요가 없거나 복제하면 안 되면 Direct Integration으로 갑니다. 복제해도 되고 검색/매시업이 필요하면 Cold Cache Summary부터 시작해 Summary 데이터 변경 빈도, 변경량, 순서 중요도를 보고 Batch Sync, Real-time Sync, Queued Real-time Sync, Ordered Real-time Sync를 선택합니다.</p>
+
+<table>
+  <tr><th>패턴</th><th>언제 선택?</th><th>핵심 의미</th></tr>
+  <tr><td>Direct Integration</td><td>복제하지 않고 외부 시스템을 직접 조회/처리해야 할 때</td><td>Integration Service를 통한 직접 연계</td></tr>
+  <tr><td>Cold Cache Summary</td><td>검색/목록/매시업을 위해 일부 Summary 데이터를 OutSystems에 보관할 때</td><td>조회 성능과 scaffold/search 지원</td></tr>
+  <tr><td>Batch Sync</td><td>Summary 데이터가 자주 변하지 않을 때</td><td>일정 주기 동기화</td></tr>
+  <tr><td>Real-time Sync</td><td>변경량이 낮고 빠른 반영이 필요할 때</td><td>즉시 동기화</td></tr>
+  <tr><td>Queued Real-time Sync</td><td>변경량이 높아 비동기 큐 처리가 필요할 때</td><td>큐로 부하 완화</td></tr>
+  <tr><td>Ordered Real-time Sync</td><td>업데이트 순서가 중요할 때</td><td>순서 보장 동기화</td></tr>
+  <tr><td>Lazy Load Details</td><td>상세 필드가 반복 사용되고 가져오는 비용이 클 때</td><td>상세 데이터는 필요 시 로딩</td></tr>
+  <tr><td>Transparency Service</td><td>같은 개념의 데이터 소스가 여러 개일 때</td><td>Consumer에게 소스 차이를 숨김</td></tr>
+</table>
+
+<hr>
+
+<h2>8. 그림 4 - Direct Integration 시작 부분</h2>
+
+<div class="diagram-wrap">
+  <svg viewBox="0 0 500 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:500px;display:block;margin:0 auto;">
+    <defs>
+      <marker id="arr4" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#555"/></marker>
+    </defs>
+    <!-- Customer_CS -->
+    <rect x="30" y="20" width="140" height="50" fill="#fdf0d8" stroke="#e8a84c" stroke-width="2" rx="4"/>
+    <text x="100" y="44" font-family="sans-serif" font-size="13" font-weight="bold" fill="#a06800" text-anchor="middle">Customer_CS</text>
+    <text x="100" y="60" font-family="sans-serif" font-size="10" fill="#a06800" text-anchor="middle">Core Service</text>
+    <!-- Arrow down -->
+    <line x1="100" y1="70" x2="100" y2="100" stroke="#555" stroke-width="1.5" marker-end="url(#arr4)"/>
+    <!-- Customer_IS -->
+    <rect x="30" y="100" width="140" height="50" fill="#d9f0e3" stroke="#5aaa78" stroke-width="2" rx="4"/>
+    <text x="100" y="124" font-family="sans-serif" font-size="13" font-weight="bold" fill="#1e6e3e" text-anchor="middle">Customer_IS</text>
+    <text x="100" y="140" font-family="sans-serif" font-size="10" fill="#1e6e3e" text-anchor="middle">Integration Service</text>
+    <!-- annotation -->
+    <text x="200" y="46" font-family="sans-serif" font-size="11" fill="#555">In this scenario, Customer data is coming from an ERP.</text>
+    <text x="200" y="61" font-family="sans-serif" font-size="11" fill="#555">Customer_IS interfaces with the ERP, abstracting a</text>
+    <text x="200" y="76" font-family="sans-serif" font-size="11" fill="#555">normalized API, both for retrieving information and</text>
+    <text x="200" y="91" font-family="sans-serif" font-size="11" fill="#555">performing transactions.</text>
+    <text x="200" y="110" font-family="sans-serif" font-size="11" fill="#555">This creates the flexibility to change the external systems</text>
+    <text x="200" y="125" font-family="sans-serif" font-size="11" fill="#555">without impacting the consumers.</text>
+  </svg>
+</div>
+<div class="diagram-caption">그림 4. Direct Integration 패턴: 외부 시스템을 직접 연계하되, Integration Service를 통해 추상화</div>
+
+<p>Direct Integration은 외부 시스템과 직접 통신하는 패턴이지만, 중요한 점은 End-user나 Core Consumer가 ERP를 직접 호출한다는 뜻이 아닙니다. 자료 문장처럼 "using the Integration Service for service abstraction"이 핵심입니다.</p>
+
+<div class="eng-box">
+  영어 시험 문장: This pattern simply represents a direct integration with the external system, using the Integration Service for service abstraction.
+</div>
+<p>한글 해석: 이 패턴은 외부 시스템과 직접 통합하는 것을 의미하지만, 서비스 추상화를 위해 Integration Service를 사용한다는 뜻입니다.</p>
+
+<hr>
+
+<h2>9. 시험 함정 포인트</h2>
+<ul>
+  <li>Integration Service는 외부 시스템별 하나가 아니라 독립적인 업무 개념별로 설계하는 것이 기본 방향입니다.</li>
+  <li>Core Service 소비자는 ERP/CRM 같은 외부 system of record를 몰라야 합니다.</li>
+  <li>REST/SOAP/File Upload 같은 기술 방식은 Integration Service 안에 숨깁니다.</li>
+  <li>Foundation/Core 구분 문제에서는 Integration Service가 기술 래퍼처럼 보이지만, Customer_IS처럼 특정 업무 개념에 묶이면 Core Services Abstraction 맥락에서 Core 개념 주변에 배치될 수 있습니다.</li>
+  <li>Summary fields는 목록/검색용이고, Detail fields는 단건 상세용입니다. 이 구분이 동기화 패턴 선택 기준입니다.</li>
+  <li>Exception handling은 보통 caller가 담당하지만, 통합 예외 메시지 표준화나 audit 목적으로 Integration Wrapper에서 고려할 수 있습니다.</li>
+</ul>
+
+<hr>
+
+<h2>10. 실전 문제풀이</h2>
+
+<div class="qa-block">
+  <div class="qa-q">Q1. Which statement best describes the purpose of an Integration Service?</div>
+  <div class="qa-ko">Q1. Integration Service의 목적을 가장 잘 설명하는 것은?</div>
+  <ul class="qa-opts">
+    <li>A. To let end-user applications directly call ERP APIs</li>
+    <li>B. To abstract external APIs and map them to internal structures and concepts</li>
+    <li>C. To replace all Core Services</li>
+    <li>D. To store all external data permanently in OutSystems</li>
+  </ul>
+  <div class="qa-answer">✅ 정답: B — Integration Service는 외부 API를 추상화하고 내부 구조/개념에 맞게 매핑합니다.</div>
+</div>
+
+<div class="qa-block">
+  <div class="qa-q">Q2. The recommended approach is to create Integration Services based on:</div>
+  <div class="qa-ko">Q2. Integration Service를 만드는 권장 방식의 기준은?</div>
+  <ul class="qa-opts">
+    <li>A. Each external system only</li>
+    <li>B. Each screen flow</li>
+    <li>C. Each independent business concept</li>
+    <li>D. Each database table name</li>
+  </ul>
+  <div class="qa-answer">✅ 정답: C — 자료의 핵심 문장: Integration Service per independent concept.</div>
+</div>
+
+<div class="qa-block">
+  <div class="qa-q">Q3. Summary fields are mainly used for:</div>
+  <div class="qa-ko">Q3. Summary fields는 주로 무엇에 사용되는가?</div>
+  <ul class="qa-opts">
+    <li>A. Listing or searching entries</li>
+    <li>B. Displaying sensitive details of a single record</li>
+    <li>C. Handling API credentials</li>
+    <li>D. Normalizing exception messages</li>
+  </ul>
+  <div class="qa-answer">✅ 정답: A — Summary fields는 목록/검색용입니다.</div>
+</div>
+
+<div class="qa-block">
+  <div class="qa-q">Q4. Which concern belongs in the Integration Wrapper Canvas?</div>
+  <div class="qa-ko">Q4. Integration Wrapper Canvas에 속하는 항목은?</div>
+  <ul class="qa-opts">
+    <li>A. Map inputs</li>
+    <li>B. Design the app logo</li>
+    <li>C. Create end-user menus</li>
+    <li>D. Define screen navigation</li>
+  </ul>
+  <div class="qa-answer">✅ 정답: A — Wrapper Canvas에는 validation, authentication, map inputs, call/audit API, normalize errors/outputs 등이 들어갑니다.</div>
+</div>
+
+<div class="qa-block">
+  <div class="qa-q">Q5. Direct Integration means:</div>
+  <div class="qa-ko">Q5. Direct Integration이 의미하는 것은?</div>
+  <ul class="qa-opts">
+    <li>A. The screen directly calls the external API</li>
+    <li>B. The Core Service must know ERP-specific structures</li>
+    <li>C. The Integration Service abstracts a direct call to the external system</li>
+    <li>D. All data must be cached in OutSystems</li>
+  </ul>
+  <div class="qa-answer">✅ 정답: C — 직접 연계라도 Integration Service를 통한 service abstraction이 핵심입니다.</div>
+</div>
+
+<hr>
+
+<h2>11. 30초 복습 키워드</h2>
+<table class="kw-table">
+  <tr><th>키워드</th><th>바로 떠올릴 내용</th></tr>
+  <tr><td>Core Service</td><td>업무 개념을 안정적으로 제공, 외부 시스템에 독립적</td></tr>
+  <tr><td>Integration Service</td><td>외부 API/프로토콜/인증/오류/출력 정규화를 감싸는 계층</td></tr>
+  <tr><td>per independent concept</td><td>Customer_IS, Product_IS처럼 개념별 분리</td></tr>
+  <tr><td>Summary fields</td><td>목록/검색용, 캐시/동기화 후보</td></tr>
+  <tr><td>Detail fields</td><td>단건 상세용, 민감/빈번 변경 가능, Lazy Load 고려</td></tr>
+  <tr><td>Direct Integration</td><td>복제하지 않지만 Integration Service로 추상화</td></tr>
+  <tr><td>Transparency Service</td><td>동일 개념에 여러 데이터 소스가 있을 때 소스 차이 숨김</td></tr>
+</table>
+
+</body>
+</html>
