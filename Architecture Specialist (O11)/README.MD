@@ -5,7 +5,7 @@
 아키텍처 전문성 시험에 응시하려면, **반응형 개발자 어소시에이트 자격증**을 취득해야 합니다.
 
 ---
-
+https://htmlpreview.github.io/?https://github.com/kckworld/outsystems_study/blob/main/Architecture%20Specialist%20(O11)/outsystems_o11_notes.html
 ## 시험 정보
 
 | 항목      | 내용          |
